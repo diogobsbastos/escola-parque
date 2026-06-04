@@ -1,0 +1,42 @@
+-- ===========================================================================
+-- 001_teachers_notes.sql
+--
+-- DESCOBERTA: A tabela `users` JA EXISTE no Supabase BR e cobre Professores
+-- via role='teacher' (default). A vinculacao com turmas/materias ja vive em
+-- `class_teacher_subjects`. Logo, NAO PRECISAMOS criar tabela paralela.
+--
+-- O Python le tudo via innova_bridge/repositories/teachers_repo.py (read-only).
+--
+-- Este arquivo fica como REFERENCIA pra extensoes futuras opcionais:
+-- ===========================================================================
+
+-- (OPCIONAL - executar SO se quisermos campos extras especificos pra UI Streamlit)
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS specialty_notes text;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS teaching_style jsonb;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS molde_default text;
+-- COMMENT ON COLUMN public.users.specialty_notes IS
+--     'Anotacoes livres sobre a especialidade pedagogica do professor (Python UI).';
+-- COMMENT ON COLUMN public.users.teaching_style IS
+--     'JSON com perfil de avaliacao: prefere multipla escolha vs dissertativa,
+--      frequencia de adaptacoes solicitadas, materias predominantes.';
+-- COMMENT ON COLUMN public.users.molde_default IS
+--     'Nome do molde de prova default usado por este professor.';
+
+-- ===========================================================================
+-- Verificacao rapida pelo prompt do Supabase SQL Editor:
+-- ===========================================================================
+
+-- Quantos professores cadastrados:
+-- SELECT COUNT(*) FROM public.users WHERE role = 'teacher';
+
+-- Lista enxuta de professores + n_turmas:
+-- SELECT
+--     u.email,
+--     u.full_name,
+--     COUNT(DISTINCT cts.class_id) AS n_turmas,
+--     COUNT(DISTINCT cts.subject_id) AS n_materias
+-- FROM public.users u
+-- LEFT JOIN public.class_teacher_subjects cts ON cts.user_id = u.id
+-- WHERE u.role = 'teacher'
+-- GROUP BY u.id
+-- ORDER BY u.full_name;

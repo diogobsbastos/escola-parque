@@ -1,0 +1,180 @@
+{
+  "schema_version": "PAI_v1.0",
+  "meta": {
+    "student_id": "aff9d57e-8be4-4ebe-8160-95fa089252ff",
+    "academic_year": "2026",
+    "grade_level": "6_ano_ef",
+    "age": 13,
+    "fill_date": "01/06/2026",
+    "teacher_name": "Marcos Monte Teste",
+    "aee_professional_name": "Profissional de AEE 1601",
+    "created_at": "2026-06-01T05:17:30.540586+00:00",
+    "created_by": "ProfileBuilderHibrido_v2.0",
+    "source_documents": [
+      "Questionario_NEEI_v2_resposta_aff9d57e-8be4-4ebe-8160-95fa089252ff_2026-06-01"
+    ],
+    "is_neurotypical_path": false,
+    "has_clinical_report": true,
+    "llm_meta": {
+      "modelo": "ollama/qwen2.5:14b",
+      "provedor": "custom/local (Ollama, vLLM, LM Studio)",
+      "base_url": "http://localhost:11434/v1",
+      "is_local": true,
+      "custo_brl": 0.0,
+      "custo_usd": 0.0,
+      "tokens_in": 4758,
+      "tokens_out": 252,
+      "tempo_s": 43.989,
+      "fallback_used": false,
+      "engine": "hybrid",
+      "system_prompt_chars": 14791,
+      "prompt_source": "custom",
+      "seed_used": 42,
+      "temperature_used": 0.3,
+      "force_json_used": false,
+      "model_digest": "7cdf5a0187d5c58cc5d369b255592f7841d1c4696d45a8c8a9489440385b22f6",
+      "model_quantization": "Q4_K_M",
+      "model_family": "qwen2",
+      "model_param_size": "14.8B",
+      "ollama_version": "0.24.0",
+      "system_fingerprint": "",
+      "audit_signature": "qwen2.5:14b:7cdf5a0187d5c58c:Q4_K_M:seed=42:t=0.3:chars=14791"
+    },
+    "approval": {
+      "status": "active"
+    }
+  },
+  "narrative": {
+    "student_summary_ptbr": "Estudante de 13 anos da turma 1601. TDAH combinado diagnosticado em 2024. Acompanha o ritmo da turma com suportes específicos.",
+    "what_works_ptbr": [
+      "Ambiente com poucos distratores",
+      "checklists visíveis",
+      "reforço positivo a cada bloco concluído",
+      "dicas metacognitivas durante a tarefa"
+    ],
+    "what_does_not_work_ptbr": [
+      "Trabalhos longos em grupo grande. Provas sem cronômetro visível"
+    ],
+    "clinical_summary_operational_ptbr": "TDAH combinado (CID F90.2). Sugere suporte 1: organização de tarefas multi-etapa, redução de distratores ambientais, fragmentação de enunciados longos.",
+    "aee_recommendations_ptbr": "Estratégias: Usar checklists; permitir reler enunciado; quebrar tarefa em micro-passos. Recursos materiais: Cronômetro visual de 15min; fones de redução de ruído opcionais."
+  },
+  "capabilities": {
+    "writing_production": {},
+    "executive_functions": {
+      "self_monitoring": "with_support",
+      "task_initiation": "with_support",
+      "task_persistence": "with_support",
+      "step_organization": "with_support",
+      "working_memory_load": "cannot",
+      "strategy_flexibility": "with_support",
+      "distraction_resistance": "cannot",
+      "sustained_attention_20min": "with_support"
+    },
+    "reading_comprehension": {},
+    "mathematical_reasoning": {
+      "place_value": "without_support",
+      "simple_fractions": "with_support",
+      "abstract_concepts": "with_support",
+      "multi_step_problems": "cannot",
+      "table_graph_reading": "with_support",
+      "large_number_operations": "with_support",
+      "small_number_operations": "without_support",
+      "word_problem_interpretation": "with_support"
+    }
+  },
+  "barriers": {
+    "long_statements": false,
+    "command_confusion": false,
+    "needs_rereading": false,
+    "figurative_language_difficulty": false,
+    "needs_command_highlight": false,
+    "multiple_instructions_loss": false,
+    "easy_distraction": true,
+    "focus_decay": true,
+    "impulsive_response": false,
+    "slow_initiation": false,
+    "answer_organization": false,
+    "multi_step_loss": true,
+    "working_memory_overload": true,
+    "instruction_forgetting": false,
+    "improves_with_reconsultation": true,
+    "slow_writing": false,
+    "motor_fatigue": false,
+    "writing_spatial_disorganization": false,
+    "time_pressure_loss": false,
+    "dense_table_loss": false,
+    "alignment_errors": false,
+    "spatial_disorganization_general": false,
+    "math_sign_confusion": false,
+    "number_inversion": false,
+    "number_order_swap": false,
+    "calculation_layout_difficulty": true,
+    "math_problem_interpretation_difficulty": false,
+    "improves_with_visual_organization": false,
+    "errors_by_disorganization_not_knowledge": true,
+    "other_observations_ptbr": null
+  },
+  "support_response": {},
+  "adaptation_budget": {
+    "statement_fragmentation": 3,
+    "language_simplification": 1,
+    "content_simplification": 0,
+    "metacognitive_hints": 3,
+    "visual_support": 2,
+    "alternatives_reduction": 1,
+    "layout_intensity": 2,
+    "command_highlighting": 3,
+    "extra_time_allowed": true
+  },
+  "hard_restrictions": {
+    "global": [
+      "do_not_change_evaluated_construct",
+      "do_not_provide_answers_in_hints",
+      "do_not_invent_content_not_in_original",
+      "preserve_question_numbering"
+    ],
+    "student_specific_ptbr": [
+      "Não há restrições específicas marcadas pela professora (Parte 6.1).",
+      "Diretriz do AEE: Usar checklists; permitir reler enunciado; quebrar tarefa em micro-passos."
+    ],
+    "personality_notes_ptbr": ""
+  },
+  "rationale": {
+    "summary_for_teacher_ptbr": "Marcos, este PAI reflete autorização para suportes específicos em quatro dimensões: fragmentação de enunciado (3), dicas metacognitivas (3), apoio visual (2) e destaque de comando (3). A Parte 5.1 indica que o estudante tem TDAH combinado, conforme laudo clínico (CID F90.2). O acompanhamento do AEE sugere a utilização de checklists visíveis, redução de distratores ambientais e fragmentação de enunciados longos para facilitar a organização de tarefas multi-etapa. Se a questão original testa conceitos abstratos ou problemas de múltiplas etapas, a versão adaptada mantém o construto avaliado — com enunciado mais curto e dicas metacognitivas adicionais. Evidências cruzadas — capacidades, barreiras, suportes e autorizações — consistentes, sem lacunas que comprometam o plano.",
+    "evidence_per_authorization": {
+      "statement_fragmentation": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "language_simplification": {
+        "intensity": 1,
+        "ptbr": "Intensidade Leve autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "metacognitive_hints": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "visual_support": {
+        "intensity": 2,
+        "ptbr": "Intensidade Moderada autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "alternatives_reduction": {
+        "intensity": 1,
+        "ptbr": "Intensidade Leve autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "layout_intensity": {
+        "intensity": 2,
+        "ptbr": "Intensidade Moderada autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "command_highlighting": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      }
+    },
+    "low_confidence_areas": [],
+    "missing_evidence": [
+      "Histórico de provas adaptadas ainda indisponível (primeiro PAI do ano).",
+      "Laudo clínico ainda não documentado (CID F90.2)."
+    ]
+  }
+}

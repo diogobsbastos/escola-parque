@@ -1,0 +1,65 @@
+[
+    {
+        "id": 1,
+        "mes": "Maio",
+        "titulo": "Setup de Servidor Linux Dedicado",
+        "status": "Pendente",
+        "valor": "R$ 1.000"
+    },
+    {
+        "id": 2,
+        "mes": "Maio",
+        "titulo": "Deploy do Banco Vetorial (pgvector)",
+        "status": "Pendente",
+        "valor": "R$ 1.000"
+    },
+    {
+        "id": 3,
+        "mes": "Maio",
+        "titulo": "Integração Core API Gemini + Segurança",
+        "status": "Pendente",
+        "valor": "R$ 1.000"
+    },
+    {
+        "id": 4,
+        "mes": "Junho",
+        "titulo": "Motor RAG: Ingestão e OCR de PDFs",
+        "status": "Pendente",
+        "valor": "R$ 1.000"
+    },
+    {
+        "id": 5,
+        "mes": "Junho",
+        "titulo": "Viabilidade: Custo otimizado para R$ 0,05",
+        "status": "Pendente",
+        "valor": "R$ 1.000"
+    },
+    {
+        "id": 6,
+        "mes": "Junho",
+        "titulo": "Criação do Banco de Prompts e Persona",
+        "status": "Pendente",
+        "valor": "R$ 1.000"
+    },
+    {
+        "id": 7,
+        "mes": "Julho",
+        "titulo": "Integração do Protocolo MCP (Obsidian Vault)",
+        "status": "Pendente",
+        "valor": "R$ 1.000"
+    },
+    {
+        "id": 8,
+        "mes": "Julho",
+        "titulo": "Dashboard de Monitoramento Financeiro/Tokens",
+        "status": "Pendente",
+        "valor": "R$ 1.000"
+    },
+    {
+        "id": 9,
+        "mes": "Julho",
+        "titulo": "Deploy Final e Testes de Carga do Sistema",
+        "status": "Pendente",
+        "valor": "R$ 1.000"
+    }
+]

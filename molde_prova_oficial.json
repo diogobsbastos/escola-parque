@@ -1,0 +1,686 @@
+{
+  "versao": "1.0",
+  "dpi_referencia": 200,
+  "fonte_pdf": "1_2_3_4_merged (1)-f88d80cc.pdf",
+  "qtd_quadrados": 46,
+  "qtd_frases_gabarito": 46,
+  "paginas": {
+    "0": {
+      "altura_px": 2339,
+      "largura_px": 1654,
+      "ancoras_fiduciais": [
+        {
+          "nome": "cabecalho_pag0_0",
+          "x": 171,
+          "y": 226,
+          "w": 976,
+          "h": 57
+        },
+        {
+          "nome": "cabecalho_pag0_1",
+          "x": 173,
+          "y": 709,
+          "w": 1035,
+          "h": 60
+        },
+        {
+          "nome": "cabecalho_pag0_2",
+          "x": 173,
+          "y": 808,
+          "w": 636,
+          "h": 31
+        },
+        {
+          "nome": "cabecalho_pag0_3",
+          "x": 173,
+          "y": 879,
+          "w": 400,
+          "h": 37
+        },
+        {
+          "nome": "cabecalho_pag0_4",
+          "x": 174,
+          "y": 951,
+          "w": 666,
+          "h": 32
+        }
+      ],
+      "quadrados": [
+        {
+          "id": 1,
+          "frase": "Tem dificuldade para entender enunciados longos",
+          "secao": "SEÇÃO 2 - LINGUAGEM E COMPREENSÃO",
+          "x": 181,
+          "y": 947,
+          "w": 37,
+          "h": 31,
+          "score": 0.738,
+          "stddev": 60.6
+        },
+        {
+          "id": 2,
+          "frase": "Confunde o que a questão está pedindo",
+          "secao": "SEÇÃO 2 - LINGUAGEM E COMPREENSÃO",
+          "x": 181,
+          "y": 983,
+          "w": 37,
+          "h": 31,
+          "score": 0.908,
+          "stddev": 59.3
+        },
+        {
+          "id": 3,
+          "frase": "Precisa reler várias vezes para compreender",
+          "secao": "SEÇÃO 2 - LINGUAGEM E COMPREENSÃO",
+          "x": 182,
+          "y": 1019,
+          "w": 37,
+          "h": 31,
+          "score": 0.706,
+          "stddev": 61.4
+        },
+        {
+          "id": 4,
+          "frase": "Tem dificuldade com linguagem indireta ou figurada",
+          "secao": "SEÇÃO 2 - LINGUAGEM E COMPREENSÃO",
+          "x": 182,
+          "y": 1056,
+          "w": 37,
+          "h": 31,
+          "score": 0.687,
+          "stddev": 63.2
+        },
+        {
+          "id": 5,
+          "frase": "Entende melhor quando o comando está destacado",
+          "secao": "SEÇÃO 2 - LINGUAGEM E COMPREENSÃO",
+          "x": 184,
+          "y": 1093,
+          "w": 34,
+          "h": 28,
+          "score": 0.704,
+          "stddev": 66.0
+        },
+        {
+          "id": 6,
+          "frase": "Se perde quando há múltiplas instruções na mesma questão",
+          "secao": "SEÇÃO 2 - LINGUAGEM E COMPREENSÃO",
+          "x": 182,
+          "y": 1271,
+          "w": 37,
+          "h": 31,
+          "score": 0.679,
+          "stddev": 67.7
+        },
+        {
+          "id": 7,
+          "frase": "Compreende melhor quando as instruções estão numeradas",
+          "secao": "SEÇÃO 2 - LINGUAGEM E COMPREENSÃO",
+          "x": 182,
+          "y": 1307,
+          "w": 37,
+          "h": 31,
+          "score": 0.702,
+          "stddev": 67.8
+        },
+        {
+          "id": 8,
+          "frase": "Distrai-se facilmente com estímulos ao redor",
+          "secao": "SEÇÃO 3 - ATENÇÃO E FUNÇÃO EXECUTIVA",
+          "x": 184,
+          "y": 1648,
+          "w": 37,
+          "h": 31,
+          "score": 0.918,
+          "stddev": 70.5
+        },
+        {
+          "id": 9,
+          "frase": "Começa a prova bem, mas perde foco ao longo do tempo",
+          "secao": "SEÇÃO 3 - ATENÇÃO E FUNÇÃO EXECUTIVA",
+          "x": 187,
+          "y": 1759,
+          "w": 34,
+          "h": 28,
+          "score": 0.691,
+          "stddev": 92.3
+        },
+        {
+          "id": 10,
+          "frase": "Responde impulsivamente e erra por desatenção",
+          "secao": "SEÇÃO 3 - ATENÇÃO E FUNÇÃO EXECUTIVA",
+          "x": 185,
+          "y": 1827,
+          "w": 37,
+          "h": 31,
+          "score": 0.758,
+          "stddev": 73.4
+        },
+        {
+          "id": 11,
+          "frase": "Tem dificuldade para organizar a resposta",
+          "secao": "SEÇÃO 3 - ATENÇÃO E FUNÇÃO EXECUTIVA",
+          "x": 185,
+          "y": 1863,
+          "w": 37,
+          "h": 31,
+          "score": 0.756,
+          "stddev": 73.9
+        },
+        {
+          "id": 12,
+          "frase": "Se perde quando precisa seguir vários passos",
+          "secao": "SEÇÃO 3 - ATENÇÃO E FUNÇÃO EXECUTIVA",
+          "x": 185,
+          "y": 1899,
+          "w": 37,
+          "h": 31,
+          "score": 0.73,
+          "stddev": 74.5
+        }
+      ]
+    },
+    "1": {
+      "altura_px": 2339,
+      "largura_px": 1654,
+      "ancoras_fiduciais": [
+        {
+          "nome": "cabecalho_pag1_0",
+          "x": 173,
+          "y": 234,
+          "w": 1040,
+          "h": 60
+        },
+        {
+          "nome": "cabecalho_pag1_1",
+          "x": 174,
+          "y": 329,
+          "w": 1062,
+          "h": 32
+        },
+        {
+          "nome": "cabecalho_pag1_2",
+          "x": 174,
+          "y": 367,
+          "w": 693,
+          "h": 33
+        },
+        {
+          "nome": "cabecalho_pag1_3",
+          "x": 175,
+          "y": 401,
+          "w": 950,
+          "h": 33
+        },
+        {
+          "nome": "cabecalho_pag1_4",
+          "x": 175,
+          "y": 564,
+          "w": 1103,
+          "h": 57
+        }
+      ],
+      "quadrados": [
+        {
+          "id": 13,
+          "frase": "Apresenta melhora quando a tarefa é dividida em partes menores",
+          "secao": "SEÇÃO 3 - ATENÇÃO E FUNÇÃO EXECUTIVA",
+          "x": 180,
+          "y": 328,
+          "w": 37,
+          "h": 31,
+          "score": 0.759,
+          "stddev": 62.5
+        },
+        {
+          "id": 14,
+          "frase": "Demonstra dificuldade para mantener várias informações na mente ao mesmo tempo",
+          "secao": "SEÇÃO 4 - MEMÓRIA E CARGA COGNITIVA",
+          "x": 181,
+          "y": 365,
+          "w": 37,
+          "h": 31,
+          "score": 0.859,
+          "stddev": 60.2
+        },
+        {
+          "id": 15,
+          "frase": "Esquece parte das instruções ao longo da execução",
+          "secao": "SEÇÃO 4 - MEMÓRIA E CARGA COGNITIVA",
+          "x": 182,
+          "y": 401,
+          "w": 37,
+          "h": 31,
+          "score": 0.855,
+          "stddev": 59.5
+        },
+        {
+          "id": 16,
+          "frase": "Tem desempenho melhor quando pode consultar novamente o enunciado",
+          "secao": "SEÇÃO 4 - MEMÓRIA E CARGA COGNITIVA",
+          "x": 182,
+          "y": 656,
+          "w": 37,
+          "h": 31,
+          "score": 0.731,
+          "stddev": 54.9
+        },
+        {
+          "id": 17,
+          "frase": "Escreve lentamente",
+          "secao": "SEÇÃO 5 - PRODUÇÃO ESCRITA E REGISTRO",
+          "x": 182,
+          "y": 692,
+          "w": 37,
+          "h": 31,
+          "score": 0.913,
+          "stddev": 54.6
+        },
+        {
+          "id": 18,
+          "frase": "Demonstra cansaço ao escrever por períodos mais longos",
+          "secao": "SEÇÃO 5 - PRODUÇÃO ESCRITA E REGISTRO",
+          "x": 182,
+          "y": 728,
+          "w": 37,
+          "h": 31,
+          "score": 0.741,
+          "stddev": 54.5
+        },
+        {
+          "id": 19,
+          "frase": "Tem dificuldade na organização espacial da escrita",
+          "secao": "SEÇÃO 5 - PRODUÇÃO ESCRITA E REGISTRO",
+          "x": 184,
+          "y": 765,
+          "w": 34,
+          "h": 28,
+          "score": 0.902,
+          "stddev": 56.2
+        },
+        {
+          "id": 20,
+          "frase": "Perde pontos por não conseguir registrar tudo a tempo",
+          "secao": "SEÇÃO 5 - PRODUÇÃO ESCRITA E REGISTRO",
+          "x": 183,
+          "y": 799,
+          "w": 37,
+          "h": 31,
+          "score": 0.768,
+          "stddev": 56.7
+        },
+        {
+          "id": 21,
+          "frase": "Apresenta melhora quando há espaço delimitado para resposta",
+          "secao": "SEÇÃO 5 - PRODUÇÃO ESCRITA E REGISTRO",
+          "x": 185,
+          "y": 1057,
+          "w": 37,
+          "h": 31,
+          "score": 0.927,
+          "stddev": 60.1
+        },
+        {
+          "id": 22,
+          "frase": "Se perde em tabelas ou gráficos densos",
+          "secao": "SEÇÃO 6 - ORGANIZAÇÃO VISUAL E ESPACIAL",
+          "x": 185,
+          "y": 1093,
+          "w": 37,
+          "h": 31,
+          "score": 0.914,
+          "stddev": 58.6
+        },
+        {
+          "id": 23,
+          "frase": "Comete erros por desalinhamento (colunas, casas decimais etc.)",
+          "secao": "SEÇÃO 6 - ORGANIZAÇÃO VISUAL E ESPACIAL",
+          "x": 187,
+          "y": 1130,
+          "w": 34,
+          "h": 28,
+          "score": 0.904,
+          "stddev": 62.2
+        },
+        {
+          "id": 24,
+          "frase": "Apresenta melhora quando usa quadriculado ou linhas-guia",
+          "secao": "SEÇÃO 6 - ORGANIZAÇÃO VISUAL E ESPACIAL",
+          "x": 186,
+          "y": 1164,
+          "w": 37,
+          "h": 31,
+          "score": 0.742,
+          "stddev": 62.3
+        },
+        {
+          "id": 25,
+          "frase": "Demonstra dificuldade em organizar informações no espaço da folha",
+          "secao": "SEÇÃO 6 - ORGANIZAÇÃO VISUAL E ESPACIAL",
+          "x": 190,
+          "y": 1646,
+          "w": 34,
+          "h": 28,
+          "score": 0.904,
+          "stddev": 69.2
+        },
+        {
+          "id": 26,
+          "frase": "Confunde sinais matemáticos (+, -, x, ÷)",
+          "secao": "SEÇÃO 7 - PROCESSAMENTO EM MATEMÁTICA / DISCIPLINAS DE EXATAS",
+          "x": 189,
+          "y": 1680,
+          "w": 37,
+          "h": 31,
+          "score": 0.93,
+          "stddev": 66.3
+        },
+        {
+          "id": 27,
+          "frase": "Troca a ordem de números em operações",
+          "secao": "SEÇÃO 7 - PROCESSAMENTO EM MATEMÁTICA / DISCIPLINAS DE EXATAS",
+          "x": 189,
+          "y": 1716,
+          "w": 37,
+          "h": 31,
+          "score": 0.919,
+          "stddev": 68.3
+        },
+        {
+          "id": 28,
+          "frase": "Demonstra dificuldade em organizar contas no papel",
+          "secao": "SEÇÃO 7 - PROCESSAMENTO EM MATEMÁTICA / DISCIPLINAS DE EXATAS",
+          "x": 191,
+          "y": 1753,
+          "w": 34,
+          "h": 28,
+          "score": 0.711,
+          "stddev": 68.8
+        },
+        {
+          "id": 29,
+          "frase": "Tem dificuldade em interpretar problemas matemáticos escritos",
+          "secao": "SEÇÃO 7 - PROCESSAMENTO EM MATEMÁTICA / DISCIPLINAS DE EXATAS",
+          "x": 192,
+          "y": 1788,
+          "w": 34,
+          "h": 28,
+          "score": 0.716,
+          "stddev": 68.0
+        },
+        {
+          "id": 30,
+          "frase": "Apresenta melhora quando a operação é visualmente organizada",
+          "secao": "SEÇÃO 7 - PROCESSAMENTO EM MATEMÁTICA / DISCIPLINAS DE EXATAS",
+          "x": 190,
+          "y": 1822,
+          "w": 37,
+          "h": 31,
+          "score": 0.912,
+          "stddev": 64.5
+        }
+      ]
+    },
+    "2": {
+      "altura_px": 2339,
+      "largura_px": 1654,
+      "ancoras_fiduciais": [
+        {
+          "nome": "cabecalho_pag2_0",
+          "x": 178,
+          "y": 301,
+          "w": 1256,
+          "h": 59
+        },
+        {
+          "nome": "cabecalho_pag2_1",
+          "x": 179,
+          "y": 396,
+          "w": 609,
+          "h": 31
+        },
+        {
+          "nome": "cabecalho_pag2_2",
+          "x": 180,
+          "y": 462,
+          "w": 477,
+          "h": 27
+        },
+        {
+          "nome": "cabecalho_pag2_3",
+          "x": 181,
+          "y": 497,
+          "w": 359,
+          "h": 28
+        },
+        {
+          "nome": "cabecalho_pag2_4",
+          "x": 181,
+          "y": 534,
+          "w": 466,
+          "h": 27
+        }
+      ],
+      "quadrados": [
+        {
+          "id": 31,
+          "frase": "Comete erros por desorganização espacial, não por desconhecimento do conteúdo",
+          "secao": "SEÇÃO 7 - PROCESSAMENTO EM MATEMÁTICA / DISCIPLINAS DE EXATAS",
+          "x": 189,
+          "y": 461,
+          "w": 34,
+          "h": 28,
+          "score": 0.835,
+          "stddev": 57.9
+        },
+        {
+          "id": 32,
+          "frase": "Dividir a prova em blocos menores",
+          "secao": "SEÇÃO 8 - O QUE JÁ FUNCIONOU",
+          "x": 189,
+          "y": 496,
+          "w": 34,
+          "h": 28,
+          "score": 0.807,
+          "stddev": 59.6
+        },
+        {
+          "id": 33,
+          "frase": "Destacar palavras-chave",
+          "secao": "SEÇÃO 8 - O QUE JÁ FUNCIONOU",
+          "x": 188,
+          "y": 530,
+          "w": 37,
+          "h": 31,
+          "score": 0.827,
+          "stddev": 57.3
+        },
+        {
+          "id": 34,
+          "frase": "Instruções em passos numerados",
+          "secao": "SEÇÃO 8 - O QUE JÁ FUNCIONOU",
+          "x": 190,
+          "y": 567,
+          "w": 34,
+          "h": 28,
+          "score": 0.836,
+          "stddev": 52.8
+        },
+        {
+          "id": 35,
+          "frase": "Layout mais limpo",
+          "secao": "SEÇÃO 8 - O QUE JÁ FUNCIONOU",
+          "x": 188,
+          "y": 601,
+          "w": 37,
+          "h": 31,
+          "score": 0.821,
+          "stddev": 57.5
+        },
+        {
+          "id": 36,
+          "frase": "Maior espaçamento entre questões",
+          "secao": "SEÇÃO 8 - O QUE JÁ FUNCIONOU",
+          "x": 188,
+          "y": 637,
+          "w": 37,
+          "h": 31,
+          "score": 0.749,
+          "stddev": 57.0
+        },
+        {
+          "id": 37,
+          "frase": "Tempo adicional (quando previsto)",
+          "secao": "SEÇÃO 8 - O QUE JÁ FUNCIONOU",
+          "x": 188,
+          "y": 672,
+          "w": 37,
+          "h": 31,
+          "score": 0.763,
+          "stddev": 56.5
+        },
+        {
+          "id": 38,
+          "frase": "Ambiente com menos distração",
+          "secao": "SEÇÃO 8 - O QUE JÁ FUNCIONOU",
+          "x": 188,
+          "y": 708,
+          "w": 37,
+          "h": 31,
+          "score": 0.898,
+          "stddev": 55.9
+        },
+        {
+          "id": 39,
+          "frase": "Quadriculado / guia visual",
+          "secao": "SEÇÃO 8 - O QUE JÁ FUNCIONOU",
+          "x": 189,
+          "y": 745,
+          "w": 34,
+          "h": 28,
+          "score": 0.892,
+          "stddev": 57.1
+        },
+        {
+          "id": 40,
+          "frase": "Imagem de suporte",
+          "secao": "SEÇÃO 8 - O QUE JÁ FUNCIONOU",
+          "x": 188,
+          "y": 780,
+          "w": 34,
+          "h": 28,
+          "score": 0.928,
+          "stddev": 55.2
+        },
+        {
+          "id": 41,
+          "frase": "Outro (campo curto)",
+          "secao": "SEÇÃO 8 - O QUE JÁ FUNCIONOU",
+          "x": 189,
+          "y": 1098,
+          "w": 34,
+          "h": 28,
+          "score": 0.738,
+          "stddev": 62.4
+        },
+        {
+          "id": 42,
+          "frase": "Simplificar o conteúdo",
+          "secao": "SEÇÃO 9 - LIMITES IMPORTANTES",
+          "x": 188,
+          "y": 1132,
+          "w": 37,
+          "h": 31,
+          "score": 0.892,
+          "stddev": 62.6
+        },
+        {
+          "id": 43,
+          "frase": "Dar pistas ou respostas",
+          "secao": "SEÇÃO 9 - LIMITES IMPORTANTES",
+          "x": 188,
+          "y": 1167,
+          "w": 37,
+          "h": 31,
+          "score": 0.908,
+          "stddev": 63.0
+        },
+        {
+          "id": 44,
+          "frase": "Alterar o objetivo da questão",
+          "secao": "SEÇÃO 9 - LIMITES IMPORTANTES",
+          "x": 189,
+          "y": 1204,
+          "w": 34,
+          "h": 28,
+          "score": 0.884,
+          "stddev": 66.7
+        },
+        {
+          "id": 45,
+          "frase": "Infantilizar a linguagem",
+          "secao": "SEÇÃO 9 - LIMITES IMPORTANTES",
+          "x": 187,
+          "y": 1238,
+          "w": 37,
+          "h": 31,
+          "score": 0.917,
+          "stddev": 63.3
+        },
+        {
+          "id": 46,
+          "frase": "Separar enunciado das alternativas",
+          "secao": "SEÇÃO 9 - LIMITES IMPORTANTES",
+          "x": 221,
+          "y": 1724,
+          "w": 34,
+          "h": 28,
+          "score": 0.684,
+          "stddev": 70.9
+        }
+      ]
+    },
+    "3": {
+      "altura_px": 2339,
+      "largura_px": 1654,
+      "ancoras_fiduciais": [
+        {
+          "nome": "cabecalho_pag3_0",
+          "x": 194,
+          "y": 264,
+          "w": 666,
+          "h": 36
+        },
+        {
+          "nome": "cabecalho_pag3_1",
+          "x": 160,
+          "y": 712,
+          "w": 910,
+          "h": 25
+        },
+        {
+          "nome": "cabecalho_pag3_2",
+          "x": 193,
+          "y": 756,
+          "w": 804,
+          "h": 26
+        },
+        {
+          "nome": "cabecalho_pag3_3",
+          "x": 169,
+          "y": 996,
+          "w": 649,
+          "h": 24
+        },
+        {
+          "nome": "cabecalho_pag3_4",
+          "x": 156,
+          "y": 1074,
+          "w": 380,
+          "h": 31
+        }
+      ],
+      "quadrados": []
+    }
+  }
+}

@@ -1,0 +1,381 @@
+================================================================================
+.clauderules  —  ESCOLA PARQUE V3 — SURGICAL RAG
+Mentor Master de Desenvolvimento / Arquiteto de Software Sênior
+Versão do Mapa: 22/05/2026  |  Estado: Migração Gemini → LiteLLM em curso
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+1. PROPÓSITO CLÍNICO E EDUCACIONAL DO SISTEMA
+────────────────────────────────────────────────────────────────────────────────
+
+O "Escola Parque V3 — Surgical RAG" é um sistema clínico-pedagógico de
+inclusão escolar. Sua missão é:
+
+  (a) MAPEAR alunos neurodivergentes — TDAH, dislexia, discalculia, TEA,
+      transtornos de processamento sensorial e demais variáveis cognitivas
+      (Atenção, Memória de Trabalho, Função Executiva, Processamento Visual,
+      Linguagem, Carga Cognitiva, Produção Escrita, Organização Espacial);
+
+  (b) DIGITALIZAR formulários clínicos em papel preenchidos a lápis pela
+      equipe pedagógica, via Visão Computacional (PyMuPDF + OpenCV) +
+      LLM Multimodal, derrotando a armadilha do "falso vazio"
+      (traços fracos e bleed-through do verso da folha);
+
+  (c) CONSOLIDAR o Perfil Pedagógico do Aluno (PPO) — estrutura JSON
+      hierárquica em SEÇÕES (Linguagem, Atenção, Memória, Produção Escrita,
+      Organização Visual, Matemática, Já-Funcionou, Limites Importantes) com
+      escala 0–5 de barreira por item;
+
+  (d) ARMAZENAR de forma anonimizada (id_anon hash) os perfis em SQLite
+      local + PostgreSQL/pgvector remoto (Supabase/Neon), permitindo busca
+      RAG por similaridade semântica entre alunos de perfil cognitivo
+      próximo;
+
+  (e) ADAPTAR PROVAS escolares (físicas e digitais) usando o PPO + base
+      de conhecimento Obsidian (MCP) como contexto de prompt, gerando
+      versões cirurgicamente reescritas — fragmentação de enunciados,
+      destaque de comandos, simplificação de layout, redução de carga
+      cognitiva — SEM nunca simplificar o conteúdo, dar pistas, alterar o
+      objetivo da questão ou infantilizar a linguagem (Seção 9 — Limites
+      Importantes do questionário oficial).
+
+LIMITES ÉTICOS NÃO-NEGOCIÁVEIS:
+  • A identidade da criança JAMAIS trafega na nuvem em texto claro — apenas
+    o id_anon (ex.: "ID-DI-a3f1b29c") é exposto à LLM e ao banco vetorial.
+  • A IA NÃO diagnostica; ela apenas transcreve marcações e organiza o que
+    a equipe pedagógica já avaliou. Decisão clínica é humana.
+  • Nenhuma adaptação pode violar a Seção 9 do questionário (Limites).
+
+────────────────────────────────────────────────────────────────────────────────
+2. MAPA MENTAL DETALHADO — ARQUIVOS E DEPENDÊNCIAS CRUZADAS
+────────────────────────────────────────────────────────────────────────────────
+
+Convenção: "A → B" significa "A importa de B" / "A depende de B".
+
+──────────────  CAMADA 0 — ORQUESTRADOR  ──────────────
+
+app.py  (552 linhas — Entry point Streamlit)
+    ├── set_page_config + sidebar Maestro
+    ├── controla st.session_state['view_mode'] entre:
+    │     'alunos' | 'motor' | 'treinamento' | 'diagnostico' |
+    │     'financeiro' | 'metas'
+    ├── @st.dialog "abrir_configuracoes()" com 3 abas:
+    │     Aba 1 — 🐘 Banco Vetorial (PostgreSQL/pgvector)
+    │     Aba 2 — 🤖 Motor IA (HOJE: carrossel Gemini /
+    │                          MIGRAÇÃO: painel LiteLLM Multi-Provider)
+    │     Aba 3 — 🔗 Protocolos (MCP / RAG / Obsidian Vault)
+    └── IMPORTS críticos (TODOS blindados em try/except):
+          ├→ funcoes_fla        (telemetria, custo BRL, cotação dólar)
+          ├→ funcoes_lab        (adapter testar/listar modelos Gemini)
+          ├→ backend_infra      (db_config.json, mcp_config.json, psycopg2)
+          ├→ storage_gemini     (pool de chaves, cooldown 60min)
+          ├→ pagina_alunos      (render_pagina_alunos)
+          ├→ pagina_treinamento
+          ├→ pagina_motor
+          ├→ pagina_metas
+          ├→ pagina_diagnostico
+          └→ pagina_financeiro  (lazy import dentro do view router)
+
+──────────────  CAMADA 1 — PÁGINAS (UI)  ──────────────
+
+pagina_alunos.py
+    ├→ backend_alunos as bk        (SQLite — alunos / questionarios / ppo)
+    ├→ backend_ocr as ocr          (pipeline OCR Vision)
+    ├→ backend_rag_export as rag   (consolidação RAG — ainda não criado)
+    ├→ pagina_debug_ocr as debug_page
+    └── Fluxo:
+        1. Lista geral (st.session_state.aluno_selecionado is None)
+        2. Prontuário com tabs: Informações | Questionário Base | PPO | Debug
+        3. Upload de PDF → ocr.extrair_texto_pdf() → ocr.analisar_com_treinamento()
+        4. Salva resultado em ocr_cache_{aluno_id}.json
+        5. Renderiza checkbox-list por SEÇÃO com escala 0–5
+
+pagina_motor.py
+    └→ backend_ocr           (versão demo do fluxo de OCR avulso)
+
+pagina_treinamento.py
+    └── Lê/grava treinamento_gemini.txt (Few-Shot Prompting da persona PAEE)
+
+pagina_diagnostico.py
+    └→ backend_diagnostico   (verifica integridade de arquivos vitais)
+
+pagina_financeiro.py
+    └── Lê historico_consumo.json e calcula totais BRL/tokens/tempo
+
+pagina_metas.py
+    └→ backend_metas         (9 metas Maio–Julho 2026 / R$ 1.000 cada)
+
+pagina_questionario_base.py   (renderer alternativo do questionário extraído)
+pagina_perfil_pedagogico.py   (renderer do PPO em barras coloridas 1–5)
+pagina_debug_ocr.py           (relatório "Cérebro da IA" — chain of thought)
+pagina_precos.py              (legado — atualização da tabela_precos.pdf via Gemini)
+
+──────────────  CAMADA 2 — BACKENDS DE DOMÍNIO  ──────────────
+
+backend_ocr.py  (487 linhas — coração do sistema)
+    ├→ storage_gemini          (get_next_valid_key, mark_key_as_standby, load_gemini_pool)
+    ├→ google.generativeai     (genai — multimodal upload + generate_content)
+    ├→ fitz (PyMuPDF)          (rasterização DPI=200)
+    ├→ cv2 + numpy             (fatiamento 6 fatias com overlap 25% / corte X=80%)
+    ├→ funcoes_fla             (load_key, registrar_consumo, calcular_custo_brl)
+    └→ funcoes_lab             (load_model_pref)
+    Pipeline:
+        1. fatiar_pdf_com_opencv()      → temp_fatias_{timestamp}/pagN_fatiaN.jpg
+        2. normalizar_referencia_opencv() → contraste alpha=1.5 das imagens-treino
+        3. Loop rotação automática de chaves:
+             genai.upload_file(...) → ALVO + TREINO (calibragem)
+             Super-prompt forense em 3 passos:
+               PASSO 1: Log "Totalmente limpo / Apenas mancha / Traço detectado"
+               PASSO 2: Regra implacável [X] vs [ ]
+               PASSO 3: Gabarito final EXATO com 41 frases oficiais
+             stream=True com log_placeholder no Streamlit
+        4. difflib.SequenceMatcher (>=0.80) para casar frase lida ↔ gabarito
+        5. Thread daemon de faxina (apaga nuvem + pasta_sessao + PDF temp)
+        6. Telemetria registrada via registrar_consumo()
+
+backend_alunos.py
+    ├── SQLite "banco_alunos.db"
+    ├── Tabelas: alunos (id_anon UUID) | questionarios (JSON) | ppo (JSON)
+    └── Funções: criar_aluno / buscar_lista_alunos / obter_detalhes_aluno
+
+backend_banco_vetorial.py
+    ├→ psycopg2 → Neon.tech / Supabase
+    ├── _obter_conexao() lê keys/db_config.json
+    ├── inicializar_infraestrutura_vetorial()
+    │     → CREATE EXTENSION vector
+    │     → CREATE TABLE alunos_ppo (vetor_ppo vector(384))
+    │     → CREATE INDEX hnsw vector_cosine_ops
+    └── inserir_aluno_ppo() com UPSERT por nome_anon
+
+backend_rag_busca.py
+    ├→ sentence_transformers.SentenceTransformer('all-MiniLM-L6-v2')  (384 dim, local, $0)
+    ├→ backend_banco_vetorial._obter_conexao
+    ├── gerar_vetor_zero_tokens(texto)
+    └── buscar_contexto_rag(texto_base, limite=3)
+          SELECT ... 1 - (vetor_ppo <=> %s::vector) AS taxa_similaridade
+          ORDER BY vetor_ppo <=> %s::vector LIMIT %s
+
+backend_obsidian_mcp.py
+    ├→ backend_infra.load_mcp_config
+    ├── varrer_vault_obsidian()  → lista .md no Vault local
+    ├── ler_conteudo_nota()
+    └── criar_nota_obsidian()    → injeta .md no Vault
+
+backend_ppo_agente.py
+    ├→ google.generativeai
+    ├→ funcoes_fla              (load_key, registrar_consumo, calcular_custo_brl)
+    └── processar_relatorio_agente(texto_ocr)
+          Prompt "Agência de 3 Agentes":
+            1. Analista PAEE  2. Psicopedagogo  3. Arquiteto de Aprendizagem
+          Saída JSON: Cognição / Linguagem / Matemática / Ajustes_Sugeridos
+
+backend_agente_pedagogico.py
+    └── obter_dados_questionario_aluno(aluno_id)   (stub/fixture atual)
+
+backend_diagnostico.py
+    └── verificar_integridade() + checar_credenciais()
+
+backend_metas.py
+    └── JSON CRUD em metas_projeto.json (Maio/Junho/Julho 2026)
+
+backend_infra.py
+    ├→ psycopg2
+    ├── Pasta "keys/" com:
+    │     keys/db_config.json   (host/porta/user/senha/dbname Neon)
+    │     keys/mcp_config.json  (mcp_ativo, rag_ativo, vault_path)
+    ├── save_db_config / load_db_config / testar_conexao_postgres
+    └── save_mcp_config / load_mcp_config
+
+──────────────  CAMADA 3 — UTILITÁRIOS E ADAPTERS  ──────────────
+
+storage_gemini.py
+    ├── Arquivo: gemini_pool.json
+    ├── COOLDOWN_TIME = 3600s (60 min na "geladeira")
+    ├── Estados de cada chave: active / standby + is_primary boolean
+    └── API: load_gemini_pool / save_gemini_pool / get_next_valid_key /
+             mark_key_as_standby / add_key_to_pool /
+             reset_key_standby / set_key_as_primary
+
+funcoes_fla.py  (motor financeiro)
+    ├── keys.json (gemini / newsdata)
+    ├── load_key / save_key
+    ├── registrar_consumo  → historico_consumo.json
+    ├── buscar_cotacao_dolar_realtime  (awesomeapi → exchangerate fallback → 5.25)
+    ├── obter_precos_do_pdf  (PyMuPDF + regex sobre tabela_precos.pdf)
+    ├── atualizar_taxas_local / ler_taxas_local  → taxas_config.json
+    └── calcular_custo_brl(modelo, input_tokens, output_tokens)
+          ⚠️ ALVO da migração LiteLLM — substituir leitura de PDF por
+             litellm.model_cost (dict oficial da biblioteca)
+
+funcoes_lab.py  (Adapter Pattern — ponte com lab_*)
+    ├→ lab_ai      (testar_conexao_gemini, listar_modelos_disponiveis, testar_modelo_especifico)
+    └→ lab_storage (load_model_pref / save_model_pref — persistido em model_pref.txt)
+
+lab_ai.py / lab_storage.py / lab_media.py / lab_utils.py
+    ⚠️ LEGADO de outro projeto (estúdio musical sertanejo).
+       NÃO TOQUE sem necessidade. Mantidos apenas porque funcoes_lab.py
+       reusa load_model_pref e algumas utilidades de listagem de modelos
+       Gemini. Demais funções (composição de letras, scraping YouTube,
+       análise de áudio) são RUÍDO arquitetural — em migração futura
+       devem ser isoladas em /legacy_musical/.
+
+──────────────  CAMADA 4 — ARQUIVOS DE ESTADO (JSON / TXT / DB)  ──────────────
+
+keys.json                 — chave Gemini principal + newsdata (legado)
+gemini_pool.json          — pool rotativo do carrossel de chaves
+keys/db_config.json       — credenciais Neon/Supabase
+keys/mcp_config.json      — flags MCP/RAG + caminho do Vault Obsidian
+taxas_config.json         — última cotação dólar + preços in/out do modelo ativo
+model_pref.txt            — modelo ativo (ex.: "gemini-2.5-flash")
+metas_projeto.json        — tracker de entregas (R$ 1.000 × 9 metas)
+historico_consumo.json    — telemetria de custo / tokens / tempo por chamada
+treinamento_gemini.txt    — Few-Shot Prompting (persona PAEE)
+tabela_precos.pdf         — PDF oficial Google AI Studio (alvo da deprecação)
+banco_alunos.db           — SQLite local com alunos/questionarios/ppo
+banco_contexto/treino_visao/  — pasta com imagens-baseline para calibragem OCR
+ocr_cache_{aluno_id}.json — última extração consolidada de cada aluno
+temp_fatias_{timestamp}/  — sessão temporária de fatias do OCR (auto-faxina)
+docker-compose.yml        — ankane/pgvector:latest para dev local (porta 5432)
+
+────────────────────────────────────────────────────────────────────────────────
+3. STACK TECNOLÓGICA OFICIAL
+────────────────────────────────────────────────────────────────────────────────
+
+Frontend           : Streamlit (st.dialog, st.status, st.session_state,
+                     st.toast, st.spinner — design "Antigravity")
+Visão Computacional: PyMuPDF (fitz) DPI=200  +  OpenCV (cv2) fatiamento
+                     6 fatias com overlap 25% e corte X=80%
+LLM Atual          : google-generativeai (Gemini 1.5 / 2.5 flash/pro)
+LLM Alvo           : LiteLLM Multi-Provider
+                     [gemini, openai, anthropic, groq, custom/local
+                      (Ollama, vLLM, LM Studio — Qwen2.5-Coder, etc.)]
+Embeddings RAG     : sentence-transformers — all-MiniLM-L6-v2 (384 dim, local, $0)
+Banco Vetorial     : PostgreSQL 16 + pgvector — Supabase / Neon.tech
+                     Índice: HNSW vector_cosine_ops
+Banco Relacional   : SQLite (banco_alunos.db) para dados clínicos locais
+Base de Conhecimento: Obsidian Vault local + MCP (Model Context Protocol)
+Custo / Telemetria : LiteLLM.model_cost  (substitui regex sobre PDF)
+Conexão BD         : psycopg2-binary
+Cotação Cambial    : awesomeapi.com.br/last/USD-BRL + exchangerate-api fallback
+Concorrência       : threading.Thread(daemon=True) para faxina assíncrona
+                     do cache local + nuvem (genai.delete_file)
+
+────────────────────────────────────────────────────────────────────────────────
+4. REGRAS DE DESENVOLVIMENTO ESTRITAS (LEIA, ASSINE E HONRE)
+────────────────────────────────────────────────────────────────────────────────
+
+[R0] PAPEL
+     Você é o MENTOR MASTER DE DESENVOLVIMENTO e ARQUITETO DE SOFTWARE SÊNIOR
+     deste projeto. Sua postura é direta, técnica, cirúrgica. Você avalia
+     arquitetura, sugere melhorias na lógica de mapeamento dos alunos, na
+     engenharia de prompt para adaptação de provas, e na escolha de modelos
+     LLM. Você empurra de volta quando o pedido fere a arquitetura.
+
+[R1] PROIBIÇÃO ABSOLUTA DE TRUNCAMENTO
+     • É TERMINANTEMENTE PROIBIDO truncar código, resumir classes ou usar
+       comentários do tipo "# resto do código aqui", "# mantenha o código
+       anterior", "// continua igual", "...", "[...]" ou equivalentes.
+     • Se o usuário pedir "me devolva o arquivo X completo", devolva da
+       linha 1 à última, sem omissões.
+     • Se a mudança for pequena (≤ 30 linhas), entregue APENAS o bloco de
+       substituição com as âncoras EXATAS (linhas de antes e depois) ou
+       use ferramentas de edição cirúrgica (Edit / Patch).
+     • Se você se vir tentado a escrever "// rest of file unchanged", PARE.
+
+[R2] BLINDAGEM DE IMPORTS E FUNÇÕES CRÍTICAS
+     • Todo import de módulo de página, backend ou biblioteca externa
+       (genai, fitz, cv2, psycopg2, sentence_transformers, litellm)
+       DEVE estar dentro de try/except ImportError com fallback gracioso.
+     • NUNCA remova um try/except existente. Se precisar refatorar, mantenha
+       a blindagem e ajuste o bloco interno.
+     • Funções que tocam rede (API LLM, cotação dólar, conexão Neon, upload
+       genai) devem ter try/except com mensagem de erro humana e nunca
+       deixar a exceção subir crua para o Streamlit.
+
+[R3] FLUIDEZ DO STREAMLIT — JAMAIS TRAVE A MAIN THREAD
+     • Tarefas pesadas (OCR, embedding, geração LLM, fatiamento PDF, ping
+       BD remoto) DEVEM usar st.spinner / st.status / st.toast para
+       feedback contínuo.
+     • Loops longos usam log_placeholder = container.empty() para streaming.
+     • Limpeza de cache e exclusão de arquivos cloud rodam em
+       threading.Thread(daemon=True), NUNCA bloqueando a UI.
+     • st.rerun() só quando estritamente necessário — evite rerun dentro
+       de loops de botão (vide os botões "Reset" e "Usar" no carrossel
+       de chaves: o rerun foi propositalmente removido para não fechar o
+       diálogo de configurações).
+
+[R4] PRESERVAÇÃO DE ESTRUTURA DE DADOS PEDAGÓGICA
+     • O mapeamento_fidedigno em backend_ocr.py (SEÇÕES 2–9) é o GABARITO
+       OFICIAL da Escola Parque. Frases NÃO podem ser editadas sem revisão
+       da equipe clínica. Se for necessário acrescentar SEÇÃO 10, ela é
+       APPEND, nunca rewrite.
+     • Escala 0–5 de barreira: 0 = sem barreira, 5 = barreira severa.
+       Marcado = True equivale a escala 4 por convenção atual
+       (vide pagina_alunos.render_ppo_tab).
+     • id_anon NUNCA pode ser substituído por apelido em chamadas LLM
+       ou inserções no Neon. Em log do Streamlit, é tolerado mostrar o
+       apelido (a tela é local). Em prompt, NÃO.
+
+[R5] CARROSSEL DE CHAVES E ROTAÇÃO
+     • Toda chamada LLM passa por get_next_valid_key().
+     • Erros 429/503/500/403/quota/exhausted → mark_key_as_standby(api_key)
+       + continue (próxima chave) — vide loop em analisar_com_treinamento.
+     • Outros erros (rede, parsing) NÃO devem queimar a chave.
+
+[R6] MIGRAÇÃO LiteLLM (estado atual do PASSO 1)
+     • Painel "Aba 2" do modal abrir_configuracoes() será reescrito:
+         - Selectbox provedores: gemini | openai | anthropic | groq |
+                                 custom/local (Ollama, vLLM)
+         - API Key (type="password")
+         - Base URL (obrigatório para local: http://localhost:11434/v1)
+         - Botão "🔄 Puxar Preços do LiteLLM" → litellm.model_cost
+     • Novo backend_litellm.py deve nascer com:
+         - validar_provedor(provider, key, base_url) via litellm.completion
+           ping mínimo
+         - obter_custos(modelo_string) → {"in": float, "out": float}
+         - rota unificada gerar_resposta(modelo, messages, **kw)
+     • funcoes_fla.calcular_custo_brl(...) deve passar a consumir
+       backend_litellm.obter_custos() em vez de regex sobre tabela_precos.pdf.
+     • storage_gemini.py continua válido para o provider Gemini.
+       Para os demais, criar storage_provedores.json análogo.
+
+[R7] NOMENCLATURA DE ARQUIVOS, COMMITS E PASTAS
+     • Arquivos de backend novos: backend_*.py (snake_case).
+     • Páginas Streamlit novas: pagina_*.py com função renderizar().
+     • Configs em JSON ficam na raiz ou em /keys/ se contiverem segredo.
+     • NUNCA commitar gemini_pool.json, keys.json ou keys/*.json com
+       valores reais — usar .gitignore se for versionar.
+
+[R8] CUSTO COGNITIVO COMO MÉTRICA DE PRIMEIRA CLASSE
+     • Toda chamada LLM registra (processo, modelo, tokens, custo_brl,
+       tempo_execucao) via registrar_consumo() em historico_consumo.json.
+     • Mudanças no pipeline OCR devem reportar impacto estimado em
+       R$/aluno na review (vide meta "R$ 0,05 por aluno" — Junho/2026).
+
+[R9] SEGURANÇA E PRIVACIDADE (LGPD)
+     • Nenhum dado identificável de menor de idade pode trafegar em prompt
+       de LLM em nuvem. Use sempre id_anon.
+     • Logs verbosos no Streamlit são tolerados localmente; em deploy,
+       desligar via toggle de configuração.
+     • Imagens de fatias do PDF são apagadas por thread de faxina ao final
+       da análise (pasta_sessao + arquivos no genai.delete_file).
+
+[R10] PROIBIÇÃO DE GAMBIARRA SILENCIOSA
+     • Se um fix exige hack temporário, comente com "# 🩹 GAMBIARRA: ..."
+       e abra um item correspondente no metas_projeto.json para refatoração.
+     • Nada de "except: pass" silenciador novo. Se já existe um (há
+       vários no código atual), pelo menos adicione um log mínimo.
+
+[R11] VERIFICAÇÃO FINAL ANTES DE DECLARAR PRONTO
+     • Após qualquer edição não-trivial, rode mentalmente:
+         (a) os imports ainda batem com o que o arquivo usa?
+         (b) os try/except foram preservados?
+         (c) o Streamlit reroda sem KeyError em session_state?
+         (d) a faxina (threading) ainda dispara?
+         (e) o custo BRL ainda calcula?
+     • Em refatorações grandes (ex.: LiteLLM), use subagent ou Plan agent
+       para revisar antes de salvar.
+
+================================================================================
+FIM DO .clauderules
+================================================================================

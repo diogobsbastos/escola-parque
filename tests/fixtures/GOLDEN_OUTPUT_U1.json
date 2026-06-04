@@ -1,0 +1,201 @@
+{
+  "schema_version": "PAI_v1.0",
+
+  "meta": {
+    "student_id": "U1",
+    "academic_year": "2026",
+    "grade_level": "2_serie_em",
+    "age": 15,
+    "fill_date": "15/05/2026",
+    "teacher_name": "Marcos Monte",
+    "aee_professional_name": "Thaís",
+    "created_at": "2026-05-15T20:00:00-03:00",
+    "created_by": "ProfileBuilderAgent_v1.0",
+    "source_documents": [
+      "Questionario_NEEI_v2_resposta_U1_2026-05-15"
+    ],
+    "approval": {
+      "status": "approved",
+      "approved_by": "Marcos Monte",
+      "approved_at": "2026-05-15T20:30:00-03:00",
+      "revision_notes_ptbr": null
+    },
+    "is_neurotypical_path": false,
+    "has_clinical_report": true
+  },
+
+  "narrative": {
+    "student_summary_ptbr": "Estudante de 15 anos da 2ª série do EM, turma 22A. Apresenta baixa interação social e tende a não se engajar em atividades em sala devido a dificuldades pessoais e de compreensão. Demonstra resposta positiva quando as tarefas são pensadas especificamente para o seu perfil, e jogos despertam algum nível de engajamento.",
+    "what_works_ptbr": [
+      "Jogos (especialmente Angry Birds) como recurso lúdico de engajamento",
+      "Questões espaçadas com fonte maior",
+      "Perguntas bem objetivas",
+      "Recorte das questões com linguagem mais simples e contas menores, sempre mantendo o conteúdo semelhante (mesmo construto avaliado)"
+    ],
+    "what_does_not_work_ptbr": [
+      "Questões com enunciado longo não funcionam para este estudante"
+    ],
+    "clinical_summary_operational_ptbr": "Estudante com perfil de suporte intenso para interação social e baixa habilidade de fala oral; necessita simplificação de conteúdo e linguagem para acessar a tarefa avaliativa, mantendo o construto matemático.",
+    "aee_recommendations_ptbr": "Estratégias: previsibilidade, questões curtas, enunciados diretos, comandos em destaque, uso de imagens. Recursos materiais: fone para reduzir ruído ambiental, leitor (mediador) para facilitar interpretação e dar dicas oralmente. Diretriz central do AEE: facilitar as questões mas manter a mesma matéria — se a matéria é exponencial, a adaptação preserva exponencial."
+  },
+
+  "capabilities": {
+    "reading_comprehension": {
+      "short_texts": "with_support",
+      "main_idea": "with_support",
+      "literal_language": "cannot",
+      "figurative_language": "cannot",
+      "command_localization": "cannot",
+      "long_statements": "cannot",
+      "multi_command_statements": "cannot"
+    },
+    "writing_production": {
+      "simple_words": "without_support",
+      "organized_sentences": "with_support",
+      "spatial_organization": "with_support",
+      "legibility_endurance": "with_support",
+      "short_texts_clarity": "with_support",
+      "self_revision": "with_support"
+    },
+    "mathematical_reasoning": {
+      "place_value": "with_support",
+      "small_number_operations": "without_support",
+      "large_number_operations": "cannot",
+      "word_problem_interpretation": "cannot",
+      "multi_step_problems": "cannot",
+      "simple_fractions": "cannot",
+      "table_graph_reading": "cannot",
+      "abstract_concepts": "cannot"
+    },
+    "executive_functions": {
+      "sustained_attention_20min": "cannot",
+      "distraction_resistance": "without_support",
+      "task_initiation": "without_support",
+      "task_persistence": "with_support",
+      "step_organization": "with_support",
+      "working_memory_load": "cannot",
+      "strategy_flexibility": "cannot",
+      "self_monitoring": "with_support"
+    }
+  },
+
+  "barriers": {
+    "long_statements": true,
+    "command_confusion": true,
+    "needs_rereading": true,
+    "figurative_language_difficulty": true,
+    "needs_command_highlight": true,
+    "multiple_instructions_loss": true,
+    "easy_distraction": false,
+    "focus_decay": false,
+    "impulsive_response": false,
+    "slow_initiation": false,
+    "answer_organization": true,
+    "multi_step_loss": true,
+    "working_memory_overload": true,
+    "instruction_forgetting": true,
+    "improves_with_reconsultation": true,
+    "slow_writing": true,
+    "motor_fatigue": false,
+    "writing_spatial_disorganization": false,
+    "time_pressure_loss": false,
+    "dense_table_loss": true,
+    "alignment_errors": true,
+    "spatial_disorganization_general": false,
+    "math_sign_confusion": false,
+    "number_inversion": false,
+    "number_order_swap": true,
+    "calculation_layout_difficulty": true,
+    "math_problem_interpretation_difficulty": true,
+    "improves_with_visual_organization": true,
+    "errors_by_disorganization_not_knowledge": false,
+    "other_observations_ptbr": null
+  },
+
+  "support_response": {
+    "worked_example_before": "yes_with_support",
+    "fragmented_statement": "yes_with_support",
+    "simplified_vocabulary": "yes_with_support",
+    "smaller_numbers": "yes_with_support",
+    "extra_time": "yes_with_support",
+    "isolated_environment": "yes_with_support",
+    "grid_lines": "yes_with_support",
+    "visual_support": "yes_with_support",
+    "metacognitive_hint": "yes_with_support",
+    "fewer_alternatives": "yes_with_support"
+  },
+
+  "adaptation_budget": {
+    "statement_fragmentation": 3,
+    "language_simplification": 3,
+    "content_simplification": 3,
+    "metacognitive_hints": 2,
+    "visual_support": 2,
+    "alternatives_reduction": 2,
+    "layout_intensity": 3,
+    "command_highlighting": 3,
+    "extra_time_allowed": true
+  },
+
+  "hard_restrictions": {
+    "global": [
+      "do_not_change_evaluated_construct",
+      "do_not_provide_answers_in_hints",
+      "do_not_invent_content_not_in_original",
+      "preserve_question_numbering"
+    ],
+    "student_specific_ptbr": [
+      "Não há restrições específicas marcadas pela professora (Parte 6.1).",
+      "Diretriz central do AEE: ao simplificar uma questão sobre exponencial, a adaptação deve continuar testando exponencial — manter o conteúdo da matéria intacto."
+    ],
+    "personality_notes_ptbr": "Estudante apresenta baixa autoestima — evitar redação que possa ser interpretada como infantilizante ou que torne visível para o estudante que ele recebeu uma versão 'mais simples'. As adaptações devem preservar a forma adulta de se dirigir ao estudante."
+  },
+
+  "rationale": {
+    "summary_for_teacher_ptbr": "Marcos, este PAI reflete autorização ampla para simplificação porque você e Thaís marcaram intensidade Intensa em fragmentação, simplificação de linguagem, simplificação de conteúdo, ajuste de layout e destaque do comando — coerente com o perfil de TEA suporte 2 com deficiência intelectual e com a sua diretriz explícita de 'facilitar mas manter a matéria'. As três autorizações Moderadas (dicas metacognitivas, suporte visual e redução de alternativas) serão aplicadas seletivamente onde a questão se beneficie. O Validador será orientado a preservar SEMPRE o construto matemático original — se a questão é exponencial, a versão adaptada continua testando exponencial, ainda que com números menores e enunciado mais curto. Cuidado adicional com a baixa autoestima do estudante: o tom da prova adaptada permanece adulto e respeitoso, sem marcas visíveis de 'versão simplificada'.",
+
+    "evidence_per_authorization": {
+      "statement_fragmentation": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1. Coerente com: Parte 2.A indica 'não realiza' para enunciados com 3+ frases e múltiplos comandos; Parte 1.5 explicita que 'questões com enunciado grande não funciona'; Parte 4.1 indica que fragmentação ajuda (com apoio); Parte 7.1 do AEE recomenda 'questões curtas, enunciados diretos'."
+      },
+      "language_simplification": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1. Coerente com: Parte 2.A indica 'não realiza' para linguagem direta/literal e figurada; Parte 1.4 menciona 'linguagem mais simples' como estratégia que funciona; Parte 4.1 confirma que vocabulário simplificado ajuda."
+      },
+      "content_simplification": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1 — esta é a autorização mais importante para este estudante. Coerente com: Parte 2.C indica 'não realiza' em operações com números grandes, problemas com múltiplas etapas, frações, gráficos, álgebra; Parte 1.4 menciona 'questões com contas menores'; Parte 7.3 deixa claro 'facilitar as questões mas manter a mesma matéria'. ATENÇÃO: o construto avaliado (ex.: exponencial) deve ser preservado em qualquer simplificação."
+      },
+      "metacognitive_hints": {
+        "intensity": 2,
+        "ptbr": "Intensidade Moderada autorizada na Parte 5.1. Coerente com: Parte 4.1 indica que dica metacognitiva ajuda (com apoio); Parte 7.2 indica que o leitor mediador 'dá dicas oralmente' — ou seja, dicas funcionam mas em contexto de mediação humana. Aplicar com moderação para não duplicar a função do mediador presente."
+      },
+      "visual_support": {
+        "intensity": 2,
+        "ptbr": "Intensidade Moderada autorizada na Parte 5.1. Coerente com: Parte 7.1 do AEE menciona uso de imagens; Parte 2.C indica 'não realiza' para tabelas e gráficos densos — portanto suportes visuais devem ser SIMPLES e auxiliares, não densos. Evitar tabelas grandes."
+      },
+      "alternatives_reduction": {
+        "intensity": 2,
+        "ptbr": "Intensidade Moderada autorizada na Parte 5.1. Aplicar quando a questão for de múltipla escolha — reduzir 5 alternativas para 3, mantendo as 3 mais distintas conceitualmente."
+      },
+      "layout_intensity": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1. Coerente com: Parte 1.4 menciona 'questões espaçadas com fonte maior'; Parte 3.E indica dificuldade com tabelas/gráficos densos e desalinhamento. Aplicar layout amplo, fonte 14pt+, uma questão por página quando possível."
+      },
+      "command_highlighting": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1. Coerente com: Parte 3.A marca 'entende melhor quando comando está destacado'; Parte 7.1 do AEE confirma 'comandos em destaque'. Aplicar negrito + caixa alta nos comandos centrais."
+      }
+    },
+
+    "low_confidence_areas": [
+      "Nenhuma área de baixa confiança neste PAI — questionário foi preenchido em conjunto pela professora regente e pelo AEE com alto detalhamento. Evidências cruzadas (capacidades + barreiras + suportes + autorizações) são consistentes."
+    ],
+
+    "missing_evidence": [
+      "Histórico de provas adaptadas anteriores ainda não está disponível (primeira execução). Após a primeira prova adaptada, recomenda-se que a professora marque quais adaptações foram efetivamente úteis para o estudante, refinando o PAI no próximo trimestre.",
+      "A intensidade exata de visual_support pode ser ajustada após observar como o estudante responde a esquemas simples vs. tabelas — dado que ele tem dificuldade com tabelas densas mas o AEE recomenda imagens."
+    ]
+  }
+}

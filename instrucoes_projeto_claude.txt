@@ -1,0 +1,76 @@
+================================================================================
+DOCUMENTO DE ESPECIFICAÇÃO TÉCNICA E DIRETRIZES DE IA
+PROJETO: ESCOLA PARQUE V3 - SURGICAL RAG (MIGRAÇÃO DE INFRAESTRUTURA LITELLM)
+================================================================================
+
+Prezado Claude (ou assistente avançado), este documento foi estruturado pelo Arquiteto de Software anterior para servir como o mapa definitivo do nosso ecossistema atual. O objetivo é contextualizar toda a arquitetura de código, heranças lógicas, dependências cruzadas e detalhar a missão atual de refatoração para que você possa assumir o desenvolvimento sem perda de alinhamento técnico.
+
+---
+1. DIRETRIZES GERAIS DE CONDUTA E REGRAS DE OURO (MANDATÓRIO)
+---
+- MODIFICAÇÃO EM ARQUIVOS LONGOS: O arquivo principal `app.py` possui mais de 550 linhas. NUNCA envie respostas contendo o código completo se isso arriscar truncamento ou omissão de trechos ("// restante do código aqui"). Prefira fornecer blocos de substituição cirúrgicos, indicando claramente as marcas de ancoragem (ex: "Substitua o bloco da Aba 2 que começa em X e termina em Y pelo seguinte código...").
+- PRESERVAÇÃO DE BLINDAGENS: Todos os módulos externos críticos e páginas secundárias são importados no topo do arquivo utilizando blocos try-except rigorosos. Nunca remova essas blindagens, pois elas evitam o colapso do ecossistema caso uma biblioteca local ou arquivo de página esteja temporariamente ausente.
+- FLUIDEZ DA THREAD PRINCIPAL: O Streamlit roda de forma síncrona por padrão. Tarefas pesadas de processamento (como fatiamento de PDF e OCR) devem utilizar feedbacks visuais nativos (st.spinner, st.toast, st.status) e nunca travar a renderização do frontend de forma opaca.
+
+---
+2. MAPA ARQUITETURAL DO PROJETO (ONDE ESTÁ CADA COISA)
+---
+
+O sistema é um ecossistema educacional de RAG Cirúrgico e Adaptação de Avaliações baseado na infraestrutura modular "Antigravity". Abaixo está a localização exata de cada operação lógica:
+
+A. app.py (Ponto de Entrada e Orquestração Visual)
+   - Linha de Frente: Controla a Sidebar (Navegação macro: Área de Alunos, Motor de Avaliações, Treinamento, Diagnóstico, Financeiro, Metas).
+   - Modal de Configurações (st.dialog): Centraliza a administração da infraestrutura em 3 Abas:
+     * Aba 1: Banco Vetorial (Conexão PostgreSQL com pgvector no Supabase/Neon).
+     * Aba 2: Motores IA (Originalmente focada apenas no Carrossel de chaves do Gemini). -> OBJETO DE REFATORAÇÃO IMEDIATA.
+     * Aba 3: Protocolos (MCP/RAG e caminhos locais do Obsidian Vault).
+
+B. backend_ocr.py (Pipeline de Visão Computacional e Transcrição)
+   - Fatiamento de Alta Resolução: Função `fatiar_pdf_com_opencv` usa PyMuPDF (fitz) e OpenCV (cv2) para quebrar o PDF em fatias geolocalizadas, evitando o "falso vazio" de traços fracos a lápis.
+   - Análise Forense: Função `analisar_com_treinamento` monta o super-prompt ancorado, anexa as fatias do documento e gerencia o loop de rotação automática de chaves (capturando falhas 429/503 e colocando as chaves em standby).
+
+C. storage_gemini.py (Pool Dinâmico de Credenciais)
+   - Gerenciamento de Cooldown: Controla o arquivo local `youtube_keys_pool.json` e as funções `get_next_valid_key()`, `mark_key_as_standby()` e `reset_key_standby()`. Serve para garantir resiliência contra estouro de cotas de APIs gratuitas.
+
+D. funcoes_fla.py (Utilitários de Telemetria e Finanças)
+   - Motor Financeiro Antigo: Centraliza a leitura da cotação do dólar em tempo real e a função `obter_precos_do_pdf()`, que usava expressões regulares agressivas (regex via pdfplumber) para varrer um PDF local (`tabela_precos.pdf`) em busca de valores de input/output por milhão de tokens.
+
+E. funcoes_lab.py (O Tradutor de Protocolos / Adaptador)
+   - Contexto de Fusão: Este arquivo serve como uma ponte (Adapter pattern) unificando funções requisitadas pelo frontend com a lógica contida nos submódulos herdados de outro estúdio musical (`lab_storage.py`, `lab_media.py`, `lab_ai.py`, `lab_utils.py`). Ele expõe funções como `listar_modelos_disponiveis()` e `testar_conexao_gemini()`.
+
+F. Submódulos lab_*.py (Motores Legados de IA e Scrape)
+   - lab_ai.py: Configurações de modelos generativos, chaves e dicionários culturais de sotaque/regionalidade.
+   - lab_utils.py: Scraping híbrido e avançado no YouTube (yt_dlp), cálculo de taxas operacionais e mineração progressiva de vídeos por volumetria de visualizações.
+
+---
+3. O PROBLEMA ATUAL (DIAGNÓSTICO DE ENGENHARIA)
+---
+1. Dependência Monolítica: O sistema foi projetado sob a premissa de que apenas o Google Gemini operaria o Core de IA. Isso limita severamente a flexibilidade de usar LLMs locais (como o Qwen2.5-Coder via Ollama/LM Studio) ou provedores corporativos alternativos (OpenAI, Anthropic, Groq).
+2. Fragilidade no Cálculo de Custos: A extração de preços baseada na raspagem de um PDF estático local (`tabela_precos.pdf`) gera alta taxa de falhas e manutenção constante por quebra de layout estrutural do PDF, além de impossibilitar a cotação automatizada de modelos de outros provedores.
+
+---
+4. ESPECIFICAÇÃO DA REFATORAÇÃO (A SUA MISSÃO)
+---
+
+Você deve guiar o desenvolvedor na transição para uma arquitetura baseada no LiteLLM (Multi-Providers), executando os seguintes passos lógicos de forma coordenada:
+
+PASSO 1: Remodelação do Frontend no `app.py`
+Substituir o layout da "Aba 2" no modal `abrir_configuracoes()` para se transformar em "🤖 Motores IA (LiteLLM)". O novo layout visual deve conter:
+- Um componente expander para "➕ Inserir Novo Provedor / LLM".
+- Um `st.selectbox` contendo os provedores suportados pelo LiteLLM: `["gemini", "openai", "anthropic", "groq", "custom/local (Ollama, vLLM)"]`.
+- Um `st.text_input(type="password")` para capturar a respectiva API Key.
+- Um `st.text_input` estratégico para "Base URL" (obrigatório para apontar para rotas locais como `http://localhost:11434/v1` no caso do Qwen/Ollama).
+- Um botão de ação para disparar o teste de ping e persistir o novo cofre de chaves.
+- Um botão "🔄 Puxar Preços do LiteLLM" acoplado a uma tabela dinâmica que substituirá a lógica antiga do PDF.
+
+PASSO 2: Criação do Backend Unificado (`backend_litellm.py`)
+Desenvolver um novo módulo que consuma a biblioteca nativa `litellm` para:
+- Mapear custos dinamicamente consultando o dicionário oficial da biblioteca (`litellm.model_cost`), trazendo valores de custo de Input e Output por milhão de tokens instantaneamente com base na string do modelo selecionado (ex: `gpt-4o-mini`, `gemini/gemini-1.5-flash`, `groq/llama3-8b-8192`).
+- Validar chaves e rotas enviando pings mínimos padronizados via `litellm.completion`.
+
+PASSO 3: Adaptação das Pontes Lógicas e Parâmetros de Entrada
+Ajustar as funções de cálculo contidas em `funcoes_fla.py` e os adaptadores de teste em `funcoes_lab.py` para que leiam a nova estrutura de dados unificada gerada pelo LiteLLM, garantindo que o `backend_ocr.py` consiga continuar realizando o cálculo dinâmico do valor financeiro das transcrições em Real (BRL).
+
+---
+Mantenha a organização cirúrgica dos arquivos, garanta o tratamento robusto de exceções e guie a implementação de forma incremental. O projeto está em suas mãos!
+================================================================================

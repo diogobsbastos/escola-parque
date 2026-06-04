@@ -1,0 +1,207 @@
+{
+  "schema_version": "PAI_v1.0",
+  "meta": {
+    "student_id": "U1",
+    "academic_year": "2026",
+    "grade_level": "2_serie_em",
+    "age": 15,
+    "fill_date": "15/05/2026",
+    "teacher_name": "Marcos Monte",
+    "aee_professional_name": "Thaís",
+    "created_at": "2026-05-31T23:51:59.007529+00:00",
+    "created_by": "ProfileBuilderHibrido_v2.0",
+    "source_documents": [
+      "Questionario_NEEI_v2_resposta_U1_2026-05-15"
+    ],
+    "is_neurotypical_path": false,
+    "has_clinical_report": true,
+    "llm_meta": {
+      "modelo": "gemini/gemini-2.5-flash",
+      "provedor": "gemini",
+      "base_url": "",
+      "is_local": false,
+      "custo_brl": 0.01226,
+      "custo_usd": 0.00234,
+      "tokens_in": 4436,
+      "tokens_out": 402,
+      "tempo_s": 13.938,
+      "fallback_used": false,
+      "engine": "hybrid",
+      "system_prompt_chars": 14791,
+      "prompt_source": "custom",
+      "seed_used": null,
+      "temperature_used": 0.1,
+      "force_json_used": true,
+      "model_digest": "",
+      "model_quantization": "",
+      "model_family": "",
+      "model_param_size": "",
+      "ollama_version": "",
+      "system_fingerprint": "",
+      "audit_signature": "gemini-2.5-flash:no-digest:?:seed=auto:t=0.1:chars=14791"
+    },
+    "approval": {
+      "status": "superseded"
+    }
+  },
+  "narrative": {
+    "student_summary_ptbr": "O estudante apresenta baixa interação social, não costuma se engajar com atividades em sala por dificuldades pessoais e falta de entendimento, salvo tarefas realizadas pensadas especificamente no perfil dele. Jogos costuma gerar algum nível de resposta.",
+    "what_works_ptbr": [
+      "Jogos com Angry Bird, questões espaçadas com fonte maior, perguntas bem objetivas e apesar de manter o conteúdo semelhante, o recorte das questões envolvem questões facilitadas, com linguagem mais simples e questões com contas menores"
+    ],
+    "what_does_not_work_ptbr": [
+      "Questões com enunciado grande não funciona"
+    ],
+    "clinical_summary_operational_ptbr": "O estudante apresenta TEA suporte 2 e deficiência intelectual. Muita dificuldade na interação social, e pouquíssima habilidade de fala.",
+    "aee_recommendations_ptbr": "Estratégias: Previsibilidade, questões curtas, enunciados diretos, comandos em destaque, imagens. Recursos materiais: fone para reduzir ruído e leitor para facilitar a interpretação e dar dicas oralmente. Estudante com deficiência intelectual. Importante facilitar as questões mas manter a mesma matéria, ou seja, se é exponencial, mantém a matéria."
+  },
+  "capabilities": {
+    "reading_comprehension": {
+      "short_texts": "with_support",
+      "main_idea": "with_support",
+      "literal_language": "cannot",
+      "figurative_language": "cannot",
+      "command_localization": "cannot",
+      "long_statements": "cannot",
+      "multi_command_statements": "cannot"
+    },
+    "writing_production": {
+      "simple_words": "without_support",
+      "organized_sentences": "with_support",
+      "spatial_organization": "with_support",
+      "legibility_endurance": "with_support",
+      "short_texts_clarity": "with_support",
+      "self_revision": "with_support"
+    },
+    "mathematical_reasoning": {
+      "place_value": "with_support",
+      "small_number_operations": "without_support",
+      "large_number_operations": "cannot",
+      "word_problem_interpretation": "cannot",
+      "multi_step_problems": "cannot",
+      "simple_fractions": "cannot",
+      "table_graph_reading": "cannot",
+      "abstract_concepts": "cannot"
+    },
+    "executive_functions": {
+      "sustained_attention_20min": "cannot",
+      "distraction_resistance": "without_support",
+      "task_initiation": "without_support",
+      "task_persistence": "with_support",
+      "step_organization": "with_support",
+      "working_memory_load": "cannot",
+      "strategy_flexibility": "cannot",
+      "self_monitoring": "with_support"
+    }
+  },
+  "barriers": {
+    "long_statements": false,
+    "command_confusion": false,
+    "needs_rereading": false,
+    "figurative_language_difficulty": false,
+    "needs_command_highlight": false,
+    "multiple_instructions_loss": false,
+    "easy_distraction": false,
+    "focus_decay": false,
+    "impulsive_response": false,
+    "slow_initiation": false,
+    "answer_organization": false,
+    "multi_step_loss": false,
+    "working_memory_overload": false,
+    "instruction_forgetting": false,
+    "improves_with_reconsultation": false,
+    "slow_writing": false,
+    "motor_fatigue": false,
+    "writing_spatial_disorganization": false,
+    "time_pressure_loss": false,
+    "dense_table_loss": false,
+    "alignment_errors": false,
+    "spatial_disorganization_general": false,
+    "math_sign_confusion": false,
+    "number_inversion": false,
+    "number_order_swap": false,
+    "calculation_layout_difficulty": false,
+    "math_problem_interpretation_difficulty": false,
+    "improves_with_visual_organization": false,
+    "errors_by_disorganization_not_knowledge": false,
+    "other_observations_ptbr": null
+  },
+  "support_response": {
+    "worked_example_before": "yes_with_support",
+    "fragmented_statement": "yes_with_support",
+    "simplified_vocabulary": "yes_with_support",
+    "smaller_numbers": "yes_with_support",
+    "extra_time": "yes_with_support",
+    "isolated_environment": "yes_with_support",
+    "grid_lines": "yes_with_support",
+    "visual_support": "yes_with_support",
+    "metacognitive_hint": "yes_with_support",
+    "fewer_alternatives": "yes_with_support"
+  },
+  "adaptation_budget": {
+    "statement_fragmentation": 3,
+    "language_simplification": 3,
+    "content_simplification": 3,
+    "metacognitive_hints": 2,
+    "visual_support": 2,
+    "alternatives_reduction": 2,
+    "layout_intensity": 3,
+    "command_highlighting": 3,
+    "extra_time_allowed": true
+  },
+  "hard_restrictions": {
+    "global": [
+      "do_not_change_evaluated_construct",
+      "do_not_provide_answers_in_hints",
+      "do_not_invent_content_not_in_original",
+      "preserve_question_numbering"
+    ],
+    "student_specific_ptbr": [
+      "Não há restrições específicas marcadas pela professora (Parte 6.1).",
+      "Diretriz do AEE: Previsibilidade, questões curtas, enunciados diretos, comandos em destaque, imagens."
+    ],
+    "personality_notes_ptbr": "Baixa auto estima. Evitar adaptações que possam ser interpretadas como infantilizantes ou que tornem visível uma 'versão mais simples' da prova — preferir manter um tom adulto e discrição na entrega do material adaptado."
+  },
+  "rationale": {
+    "summary_for_teacher_ptbr": "Marcos e Thaís, este Plano de Adaptação Individual (PAI) reflete um perfil de estudante com TEA suporte 2 e deficiência intelectual, conforme Parte 1.2.1, com desafios significativos na interação social e comunicação verbal. A Parte 5.1 autorizou adaptações intensas em fragmentação de enunciado, simplificação de linguagem, simplificação de conteúdo, layout (espaçamento amplo) e destaque de comando, além de apoios moderados em dicas metacognitivas, apoio visual e redução de alternativas, e tempo adicional. Essas autorizações são consistentes com o que funciona (Parte 1.4), como questões espaçadas, linguagem simples e objetividade, e com as estratégias do AEE (Parte 7), que incluem questões curtas e comandos em destaque. As adaptações visam mitigar barreiras como a dificuldade com enunciados longos, múltiplos comandos, interpretação de problemas e conceitos abstratos (Parte 3), preservando sempre o construto avaliado. Dada a baixa autoestima do estudante (Parte 1.1), é crucial que as adaptações sejam entregues de forma discreta e com um tom adulto, evitando qualquer marcação que possa evidenciar uma 'versão mais simples'. Evidências cruzadas — capacidades, barreiras, suportes e autorizações — consistentes, sem lacunas que comprometam o plano.",
+    "evidence_per_authorization": {
+      "statement_fragmentation": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "language_simplification": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "content_simplification": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "metacognitive_hints": {
+        "intensity": 2,
+        "ptbr": "Intensidade Moderada autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "visual_support": {
+        "intensity": 2,
+        "ptbr": "Intensidade Moderada autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "alternatives_reduction": {
+        "intensity": 2,
+        "ptbr": "Intensidade Moderada autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "layout_intensity": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "command_highlighting": {
+        "intensity": 3,
+        "ptbr": "Intensidade Intensa autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      }
+    },
+    "low_confidence_areas": [],
+    "missing_evidence": [
+      "Histórico de provas adaptadas ainda indisponível (primeiro PAI do ano).",
+      "Após a primeira prova, registrar quais adaptações foram efetivamente úteis para calibrar a aplicação."
+    ]
+  }
+}

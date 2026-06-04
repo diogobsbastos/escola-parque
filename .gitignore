@@ -1,0 +1,31 @@
+# ---- SEGREDOS (NUNCA versionar) ----
+keys/
+keys.json
+*_keys.json
+*_key.txt
+gemini_key.txt
+gemini_pool.json
+youtube_keys_pool.json
+spotify_keys.json
+br-credentials.json
+providers_litellm.json
+agents_pool.json
+bancos_pool.json
+# ---- DADOS DE ALUNOS / BANCOS (LGPD) ----
+*.db
+banco_contexto/
+obsidian/
+moldes/
+# ---- CACHES / RUNTIME / LIXO ----
+__pycache__/
+.venv/
+*.pyc
+*.bak
+ocr_cache*.json
+historico_*.json
+fiscal_history.json
+radar_history.json
+cotacao_dolar.json
+_rollback_*.txt
+_probe_mount.txt
+teste_sync.txt

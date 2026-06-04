@@ -1,0 +1,142 @@
+{
+  "_meta_estudo_de_caso": {
+    "objetivo": "Dados de entrada (INPUT) usados para gerar o PAI do Aluno 1 (U1) — o que existiu ANTES do PAI.",
+    "aluno": "U1 (Estudante U1 / aluno-demo do seed)",
+    "procedencia_dos_dados": "ATENÇÃO: o arquivo de questionário original do U1 (referenciado pelo PAI como 'Questionario_NEEI_v2_resposta_U1_2026-05-15') NÃO está versionado no repositório. No seed (web/src/db/seed.ts) o PAI do U1 é inserido diretamente a partir do fixture docs/PAI_aluno_U1_2026.json, sem gravar questionário de entrada nem agent_run_log. Portanto este input foi RECONSTRUÍDO a partir dos campos que o próprio PAI incorpora (capabilities, barriers, support_response, narrative) e das citações de evidência (rationale.evidence_per_authorization, que referenciam Partes 1 a 7 do questionário NEEI v2).",
+    "fonte_declarada_pelo_pai": "Questionario_NEEI_v2_resposta_U1_2026-05-15",
+    "schema_de_referencia": "profileBuilderInputSchema (web/src/lib/zod/questionnaire.ts)",
+    "confiabilidade": {
+      "campos_literais_do_pai": ["capabilities", "support_response", "narrative.what_works", "narrative.what_does_not_work", "identification"],
+      "campos_inferidos": ["barriers (no PAI são booleans; no questionário são arrays de texto)", "adaptation_authorizations (derivado de adaptation_budget + rationale: 3=intense, 2=moderate)", "laudo_summary (citado no rationale como 'TEA suporte 2 com deficiência intelectual')"]
+    }
+  },
+
+  "questionnaire_response": {
+    "identification": {
+      "student_id": "U1",
+      "age": 15,
+      "grade_level": "2_serie_em",
+      "fill_date": "15/05/2026",
+      "teacher_name": "Marcos Monte",
+      "aee_professional_name": "Thaís"
+    },
+    "characterization": {
+      "student_summary": "Estudante de 15 anos da 2ª série do EM, turma 22A. Apresenta baixa interação social e tende a não se engajar em atividades em sala devido a dificuldades pessoais e de compreensão. Demonstra resposta positiva quando as tarefas são pensadas especificamente para o seu perfil, e jogos despertam algum nível de engajamento.",
+      "has_clinical_report": true,
+      "clinical_summary": "Perfil de TEA (suporte 2) com deficiência intelectual; suporte intenso para interação e compreensão.",
+      "current_supports": "Presença de mediador/leitor em sala (Parte 7.2: o leitor mediador dá dicas oralmente). AEE recomenda questões curtas, enunciados diretos, comandos em destaque e uso de imagens (Parte 7.1).",
+      "what_works": "Jogos (especialmente Angry Birds) como recurso lúdico de engajamento; questões espaçadas com fonte maior; perguntas bem objetivas; recorte das questões com linguagem mais simples e contas menores, sempre mantendo o mesmo construto avaliado.",
+      "what_did_not_work": "Questões com enunciado longo não funcionam para este estudante."
+    },
+    "capabilities": {
+      "reading_comprehension": {
+        "short_texts": "with_support",
+        "main_idea": "with_support",
+        "literal_language": "cannot",
+        "figurative_language": "cannot",
+        "command_localization": "cannot",
+        "long_statements": "cannot",
+        "multi_command_statements": "cannot"
+      },
+      "writing_production": {
+        "simple_words": "without_support",
+        "organized_sentences": "with_support",
+        "spatial_organization": "with_support",
+        "legibility_endurance": "with_support",
+        "short_texts_clarity": "with_support",
+        "self_revision": "with_support"
+      },
+      "mathematical_reasoning": {
+        "place_value": "with_support",
+        "small_number_operations": "without_support",
+        "large_number_operations": "cannot",
+        "word_problem_interpretation": "cannot",
+        "multi_step_problems": "cannot",
+        "simple_fractions": "cannot",
+        "table_graph_reading": "cannot",
+        "abstract_concepts": "cannot"
+      },
+      "executive_functions": {
+        "sustained_attention_20min": "cannot",
+        "distraction_resistance": "without_support",
+        "task_initiation": "without_support",
+        "task_persistence": "with_support",
+        "step_organization": "with_support",
+        "working_memory_load": "cannot",
+        "strategy_flexibility": "cannot",
+        "self_monitoring": "with_support"
+      }
+    },
+    "barriers": {
+      "_nota": "No questionário NEEI v2 estes campos são arrays de texto por categoria; no PAI vêm como flags booleanas. Abaixo estão as barreiras marcadas como TRUE no PAI, reagrupadas por categoria.",
+      "language_comprehension": [
+        "long_statements",
+        "command_confusion",
+        "needs_rereading",
+        "figurative_language_difficulty",
+        "needs_command_highlight",
+        "multiple_instructions_loss"
+      ],
+      "attention_executive": [
+        "improves_with_reconsultation"
+      ],
+      "working_memory": [
+        "answer_organization",
+        "multi_step_loss",
+        "working_memory_overload",
+        "instruction_forgetting"
+      ],
+      "writing_production": [
+        "slow_writing"
+      ],
+      "visual_spatial": [
+        "dense_table_loss",
+        "alignment_errors"
+      ],
+      "math_specific": [
+        "number_order_swap",
+        "calculation_layout_difficulty",
+        "math_problem_interpretation_difficulty",
+        "improves_with_visual_organization"
+      ],
+      "other_observations": null
+    },
+    "support_response": [
+      { "support_type": "worked_example_before", "response": "yes_with_support" },
+      { "support_type": "fragmented_statement", "response": "yes_with_support" },
+      { "support_type": "simplified_vocabulary", "response": "yes_with_support" },
+      { "support_type": "smaller_numbers", "response": "yes_with_support" },
+      { "support_type": "extra_time", "response": "yes_with_support" },
+      { "support_type": "isolated_environment", "response": "yes_with_support" },
+      { "support_type": "grid_lines", "response": "yes_with_support" },
+      { "support_type": "visual_support", "response": "yes_with_support" },
+      { "support_type": "metacognitive_hint", "response": "yes_with_support" },
+      { "support_type": "fewer_alternatives", "response": "yes_with_support" }
+    ],
+    "adaptation_authorizations": [
+      { "dimension": "statement_fragmentation", "intensity": "intense" },
+      { "dimension": "language_simplification", "intensity": "intense" },
+      { "dimension": "content_simplification", "intensity": "intense" },
+      { "dimension": "metacognitive_hints", "intensity": "moderate" },
+      { "dimension": "visual_support", "intensity": "moderate" },
+      { "dimension": "alternatives_reduction", "intensity": "moderate" },
+      { "dimension": "layout_intensity", "intensity": "intense" },
+      { "dimension": "command_highlighting", "intensity": "intense" }
+    ],
+    "extra_time_authorized": true,
+    "specific_restrictions": null,
+    "personality_notes": "Estudante apresenta baixa autoestima — evitar redação que possa ser interpretada como infantilizante ou que torne visível que ele recebeu uma versão 'mais simples'. As adaptações devem preservar a forma adulta de se dirigir ao estudante.",
+    "aee_observations": {
+      "specific_strategies": "Questões curtas, enunciados diretos, comandos em destaque (Parte 7.1). Diretriz central: ao simplificar uma questão sobre exponencial, manter o construto exponencial — facilitar mas manter a matéria (Parte 7.3).",
+      "material_resources": "Uso de imagens/suportes visuais simples (Parte 7.1). Leitor mediador presente que dá dicas oralmente (Parte 7.2).",
+      "other": null
+    },
+    "fill_metadata": {
+      "filled_jointly": true,
+      "justification": "Questionário preenchido em conjunto pela professora regente (Marcos Monte) e pelo AEE (Thaís) com alto detalhamento."
+    }
+  },
+
+  "laudo_summary": "TEA (suporte 2) com deficiência intelectual. Perfil de suporte intenso para interação social e compreensão.",
+  "historical_data": null
+}

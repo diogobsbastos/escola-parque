@@ -1,0 +1,193 @@
+{
+  "schema_version": "PAI_v1.0",
+  "meta": {
+    "student_id": "U1",
+    "academic_year": "2026",
+    "grade_level": "6_ano_ef",
+    "age": 11,
+    "fill_date": "17/05/2026",
+    "teacher_name": "Docente de Matemática 1601",
+    "aee_professional_name": null,
+    "created_at": "2026-05-31T17:52:36.072816+00:00",
+    "created_by": "ProfileBuilderHibrido_v2.0",
+    "source_documents": [
+      "Questionario_NEEI_v2_resposta_U1_2026-05-17"
+    ],
+    "is_neurotypical_path": true,
+    "has_clinical_report": false,
+    "llm_meta": {
+      "modelo": "ollama/qwen2.5vl:7b",
+      "provedor": "custom/local (Ollama, vLLM, LM Studio)",
+      "base_url": "http://localhost:11434/v1",
+      "is_local": true,
+      "custo_brl": 0.0,
+      "custo_usd": 0.0,
+      "tokens_in": 3261,
+      "tokens_out": 495,
+      "tempo_s": 75.078,
+      "fallback_used": false,
+      "engine": "hybrid",
+      "system_prompt_chars": 9869,
+      "prompt_source": "custom",
+      "seed_used": 42,
+      "temperature_used": 0.3,
+      "force_json_used": false,
+      "model_digest": "5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc",
+      "model_quantization": "Q4_K_M",
+      "model_family": "qwen25vl",
+      "model_param_size": "8.3B",
+      "ollama_version": "0.24.0",
+      "system_fingerprint": "fp_ollama",
+      "audit_signature": "qwen2.5vl:7b:5ced39dfa4bac325:Q4_K_M:seed=42:t=0.3:chars=9869"
+    },
+    "approval": {
+      "status": "superseded"
+    }
+  },
+  "narrative": {
+    "student_summary_ptbr": "Estudante de 11 anos da turma 1601, perfil neurotípico. Engaja-se nas atividades regularmente, acompanha o ritmo da turma e demonstra autonomia na maior parte das tarefas. Sem laudo clínico ou suspeita de transtorno de aprendizagem.",
+    "what_works_ptbr": [
+      "Aulas com explicação clara antes da atividade. Trabalho em duplas em situações novas. Reforço positivo verbal"
+    ],
+    "what_does_not_work_ptbr": [],
+    "clinical_summary_operational_ptbr": null,
+    "aee_recommendations_ptbr": "Sem recomendações específicas do AEE."
+  },
+  "capabilities": {
+    "reading_comprehension": {
+      "short_texts": "without_support",
+      "main_idea": "without_support",
+      "literal_language": "without_support",
+      "figurative_language": "with_support",
+      "command_localization": "without_support",
+      "long_statements": "with_support",
+      "multi_command_statements": "with_support"
+    },
+    "writing_production": {
+      "simple_words": "without_support",
+      "organized_sentences": "without_support",
+      "spatial_organization": "without_support",
+      "legibility_endurance": "without_support",
+      "short_texts_clarity": "without_support",
+      "self_revision": "with_support"
+    },
+    "mathematical_reasoning": {
+      "place_value": "without_support",
+      "small_number_operations": "without_support",
+      "large_number_operations": "without_support",
+      "word_problem_interpretation": "with_support",
+      "multi_step_problems": "with_support",
+      "simple_fractions": "without_support",
+      "table_graph_reading": "without_support",
+      "abstract_concepts": "with_support"
+    },
+    "executive_functions": {
+      "sustained_attention_20min": "without_support",
+      "distraction_resistance": "without_support",
+      "task_initiation": "without_support",
+      "task_persistence": "without_support",
+      "step_organization": "without_support",
+      "working_memory_load": "with_support",
+      "strategy_flexibility": "with_support",
+      "self_monitoring": "with_support"
+    }
+  },
+  "barriers": {
+    "long_statements": false,
+    "command_confusion": false,
+    "needs_rereading": false,
+    "figurative_language_difficulty": false,
+    "needs_command_highlight": false,
+    "multiple_instructions_loss": false,
+    "easy_distraction": false,
+    "focus_decay": false,
+    "impulsive_response": false,
+    "slow_initiation": false,
+    "answer_organization": false,
+    "multi_step_loss": false,
+    "working_memory_overload": false,
+    "instruction_forgetting": false,
+    "improves_with_reconsultation": false,
+    "slow_writing": false,
+    "motor_fatigue": false,
+    "writing_spatial_disorganization": false,
+    "time_pressure_loss": false,
+    "dense_table_loss": false,
+    "alignment_errors": false,
+    "spatial_disorganization_general": false,
+    "math_sign_confusion": false,
+    "number_inversion": false,
+    "number_order_swap": false,
+    "calculation_layout_difficulty": false,
+    "math_problem_interpretation_difficulty": false,
+    "improves_with_visual_organization": false,
+    "errors_by_disorganization_not_knowledge": false,
+    "other_observations_ptbr": null
+  },
+  "support_response": {
+    "worked_example_before": "yes_alone",
+    "fragmented_statement": "not_tested",
+    "simplified_vocabulary": "not_tested",
+    "smaller_numbers": "not_tested",
+    "extra_time": "yes_alone",
+    "isolated_environment": "not_tested",
+    "grid_lines": "not_tested",
+    "visual_support": "yes_alone",
+    "metacognitive_hint": "yes_alone",
+    "fewer_alternatives": "not_tested"
+  },
+  "adaptation_budget": {
+    "statement_fragmentation": 0,
+    "language_simplification": 0,
+    "content_simplification": 0,
+    "metacognitive_hints": 1,
+    "visual_support": 1,
+    "alternatives_reduction": 0,
+    "layout_intensity": 1,
+    "command_highlighting": 1,
+    "extra_time_allowed": false
+  },
+  "hard_restrictions": {
+    "global": [
+      "do_not_change_evaluated_construct",
+      "do_not_provide_answers_in_hints",
+      "do_not_invent_content_not_in_original",
+      "preserve_question_numbering"
+    ],
+    "student_specific_ptbr": [
+      "Não há restrições específicas marcadas pela professora (Parte 6.1)."
+    ],
+    "personality_notes_ptbr": "Estudante participativo, gosta de ser desafiado. Evitar adaptações que possam soar como subestimação do potencial — preferir intervenções discretas (layout, destaque de comando) a simplificações visíveis."
+  },
+  "rationale": {
+    "summary_for_teacher_ptbr": "Estudante de 11 anos da turma 1601, perfil neurotípico, que se engaja regularmente nas atividades e acompanha o ritmo da turma. As autorizações da Parte 5.1 foram todas de intensidade Leve em quatro dimensões: dicas metacognitivas, suporte visual, layout e destaque de comando. A Parte 4.1 confirma resposta 'sim, sozinho' a exemplos resolvidos e apoio visual. Como não há barreiras na Parte 3, espera-se adaptações discretas e pontuais, preservando sempre o construto avaliado. O estudante gosta de ser desafiado, então as adaptações devem ser discretas e não subestimarem o potencial.",
+    "evidence_per_authorization": {
+      "metacognitive_hints": {
+        "intensity": 1,
+        "ptbr": "Intensidade Leve autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "visual_support": {
+        "intensity": 1,
+        "ptbr": "Intensidade Leve autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "layout_intensity": {
+        "intensity": 1,
+        "ptbr": "Intensidade Leve autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      },
+      "command_highlighting": {
+        "intensity": 1,
+        "ptbr": "Intensidade Leve autorizada na Parte 5.1 do questionário. Orçamento transcrito diretamente da autorização do(a) docente/AEE."
+      }
+    },
+    "low_confidence_areas": [
+      "Parte 4.1: vários apoios marcados como 'não testado' (fragmentação de enunciado, vocabulário simplificado, números menores, ambiente isolado, papel quadriculado, menos alternativas) — sem evidência de necessidade nem de dispensa; observar em provas futuras.",
+      "Ausência de barreiras na Parte 3 combinada com itens 'com apoio' na Parte 2 (linguagem figurada, enunciados longos, problemas de múltiplas etapas, conceitos abstratos, memória de trabalho, automonitoramento) sugere pontos de atenção sutis ainda não nomeados."
+    ],
+    "missing_evidence": [
+      "Histórico de provas adaptadas ainda indisponível (primeiro PAI do ano).",
+      "Sem acompanhamento AEE — Parte 7 em branco.",
+      "Parte 1.5 ('o que não funcionou') deixada em branco.",
+      "A intensidade exata das adaptações Leves pode ser calibrada após observar a resposta nas primeiras provas."
+    ]
+  }
+}

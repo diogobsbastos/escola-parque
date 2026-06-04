@@ -1,0 +1,164 @@
+{
+  "questionnaire_response": {
+    "identification": {
+      "student_id": "U2",
+      "age": 11,
+      "grade_level": "6_ano_ef",
+      "fill_date": "17/05/2026",
+      "teacher_name": "Docente de Matemática 1601",
+      "aee_professional_name": null
+    },
+    "characterization": {
+      "student_summary": "Estudante de 11 anos da turma 1601, perfil neurotípico. Engaja-se nas atividades regularmente, acompanha o ritmo da turma e demonstra autonomia na maior parte das tarefas. Sem laudo clínico ou suspeita de transtorno de aprendizagem.",
+      "has_clinical_report": false,
+      "clinical_summary": null,
+      "current_supports": "Nenhum suporte específico em vigor. Estudante acompanha a turma sem mediação adicional.",
+      "what_works": "Aulas com explicação clara antes da atividade. Trabalho em duplas em situações novas. Reforço positivo verbal.",
+      "what_did_not_work": null
+    },
+    "capabilities": {
+      "reading_comprehension": {
+        "short_texts": "without_support",
+        "main_idea": "without_support",
+        "literal_language": "without_support",
+        "figurative_language": "with_support",
+        "command_localization": "without_support",
+        "long_statements": "with_support",
+        "multi_command_statements": "with_support"
+      },
+      "writing_production": {
+        "simple_words": "without_support",
+        "organized_sentences": "without_support",
+        "spatial_organization": "without_support",
+        "legibility_endurance": "without_support",
+        "short_texts_clarity": "without_support",
+        "self_revision": "with_support"
+      },
+      "mathematical_reasoning": {
+        "place_value": "without_support",
+        "small_number_operations": "without_support",
+        "large_number_operations": "without_support",
+        "word_problem_interpretation": "with_support",
+        "multi_step_problems": "with_support",
+        "simple_fractions": "without_support",
+        "table_graph_reading": "without_support",
+        "abstract_concepts": "with_support"
+      },
+      "executive_functions": {
+        "sustained_attention_20min": "without_support",
+        "distraction_resistance": "without_support",
+        "task_initiation": "without_support",
+        "task_persistence": "without_support",
+        "step_organization": "without_support",
+        "working_memory_load": "with_support",
+        "strategy_flexibility": "with_support",
+        "self_monitoring": "with_support"
+      }
+    },
+    "barriers": {
+      "language_comprehension": [],
+      "attention_executive": [],
+      "working_memory": [],
+      "writing_production": [],
+      "visual_spatial": [],
+      "math_specific": [],
+      "other_observations": null
+    },
+    "support_response": [
+      {
+        "support_type": "worked_example_before",
+        "response": "yes_alone"
+      },
+      {
+        "support_type": "fragmented_statement",
+        "response": "not_tested"
+      },
+      {
+        "support_type": "simplified_vocabulary",
+        "response": "not_tested"
+      },
+      {
+        "support_type": "smaller_numbers",
+        "response": "not_tested"
+      },
+      {
+        "support_type": "extra_time",
+        "response": "yes_alone"
+      },
+      {
+        "support_type": "isolated_environment",
+        "response": "not_tested"
+      },
+      {
+        "support_type": "grid_lines",
+        "response": "not_tested"
+      },
+      {
+        "support_type": "visual_support",
+        "response": "yes_alone"
+      },
+      {
+        "support_type": "metacognitive_hint",
+        "response": "yes_alone"
+      },
+      {
+        "support_type": "fewer_alternatives",
+        "response": "not_tested"
+      }
+    ],
+    "adaptation_authorizations": [
+      {
+        "dimension": "statement_fragmentation",
+        "intensity": "not_authorized"
+      },
+      {
+        "dimension": "language_simplification",
+        "intensity": "not_authorized"
+      },
+      {
+        "dimension": "content_simplification",
+        "intensity": "not_authorized"
+      },
+      {
+        "dimension": "metacognitive_hints",
+        "intensity": "light"
+      },
+      {
+        "dimension": "visual_support",
+        "intensity": "light"
+      },
+      {
+        "dimension": "alternatives_reduction",
+        "intensity": "not_authorized"
+      },
+      {
+        "dimension": "layout_intensity",
+        "intensity": "light"
+      },
+      {
+        "dimension": "command_highlighting",
+        "intensity": "light"
+      }
+    ],
+    "extra_time_authorized": false,
+    "specific_restrictions": null,
+    "personality_notes": "Estudante participativo, gosta de ser desafiado.",
+    "aee_observations": {
+      "specific_strategies": null,
+      "material_resources": null,
+      "other": null
+    },
+    "fill_metadata": {
+      "filled_jointly": false,
+      "justification": "Estudante sem acompanhamento AEE — questionário preenchido apenas pela professora regente."
+    }
+  },
+  "laudo_summary": null,
+  "historical_data": null,
+  "_meta_persistencia": {
+    "aluno_id": "U1",
+    "source": "U2_neurotipico",
+    "saved_at": "2026-05-31T14:46:11.868665",
+    "filename": "U1_NEEI_v3_0_U2_neurotipico_20260531_144611.json"
+  }
+}

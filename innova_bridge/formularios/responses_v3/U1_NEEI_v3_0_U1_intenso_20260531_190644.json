@@ -1,0 +1,188 @@
+{
+  "questionnaire_response": {
+    "identification": {
+      "student_id": "U1",
+      "age": 15,
+      "grade_level": "2_serie_em",
+      "fill_date": "15/05/2026",
+      "teacher_name": "Marcos Monte",
+      "aee_professional_name": "Thaís"
+    },
+    "characterization": {
+      "student_summary": "Estudante de 15 anos da 2ª série do EM, turma 22A. Apresenta baixa interação social e tende a não se engajar em atividades em sala devido a dificuldades pessoais e de compreensão. Demonstra resposta positiva quando as tarefas são pensadas especificamente para o seu perfil, e jogos despertam algum nível de engajamento.",
+      "has_clinical_report": true,
+      "clinical_summary": "TEA (suporte nível 2) com deficiência intelectual associada. Perfil de suporte intenso para interação social e compreensão de linguagem.",
+      "current_supports": "Presença de mediador/leitor em sala, que lê os enunciados e dá dicas orais. Sem outras adaptações formais em vigor antes deste questionário.",
+      "what_works": "Jogos (especialmente Angry Birds) como recurso lúdico de engajamento; questões espaçadas com fonte maior; perguntas bem objetivas; recorte das questões com linguagem mais simples e contas menores, sempre mantendo o mesmo construto avaliado.",
+      "what_did_not_work": "Questões com enunciado longo não funcionam para este estudante."
+    },
+    "capabilities": {
+      "reading_comprehension": {
+        "short_texts": "with_support",
+        "main_idea": "with_support",
+        "literal_language": "cannot",
+        "figurative_language": "cannot",
+        "command_localization": "cannot",
+        "long_statements": "cannot",
+        "multi_command_statements": "cannot"
+      },
+      "writing_production": {
+        "simple_words": "without_support",
+        "organized_sentences": "with_support",
+        "spatial_organization": "with_support",
+        "legibility_endurance": "with_support",
+        "short_texts_clarity": "with_support",
+        "self_revision": "with_support"
+      },
+      "mathematical_reasoning": {
+        "place_value": "with_support",
+        "small_number_operations": "without_support",
+        "large_number_operations": "cannot",
+        "word_problem_interpretation": "cannot",
+        "multi_step_problems": "cannot",
+        "simple_fractions": "cannot",
+        "table_graph_reading": "cannot",
+        "abstract_concepts": "cannot"
+      },
+      "executive_functions": {
+        "sustained_attention_20min": "cannot",
+        "distraction_resistance": "without_support",
+        "task_initiation": "without_support",
+        "task_persistence": "with_support",
+        "step_organization": "with_support",
+        "working_memory_load": "cannot",
+        "strategy_flexibility": "cannot",
+        "self_monitoring": "with_support"
+      }
+    },
+    "barriers": {
+      "language_comprehension": [
+        "Perde-se em enunciados longos",
+        "Confunde o que é pedido pelo comando",
+        "Precisa reler várias vezes para entender",
+        "Tem dificuldade com linguagem figurada",
+        "Compreende melhor quando o comando está em destaque",
+        "Perde-se quando há múltiplas instruções na mesma questão"
+      ],
+      "attention_executive": [
+        "Melhora quando pode reconsultar o enunciado"
+      ],
+      "working_memory": [
+        "Tem dificuldade em organizar a resposta",
+        "Perde-se em etapas de tarefas longas",
+        "Sobrecarrega memória de trabalho",
+        "Esquece instruções dadas há pouco"
+      ],
+      "writing_production": [
+        "Escreve devagar"
+      ],
+      "visual_spatial": [
+        "Perde-se em tabelas e gráficos densos",
+        "Erra por desalinhamento"
+      ],
+      "math_specific": [
+        "Troca a ordem dos números na conta",
+        "Dificuldade em montar a conta no papel",
+        "Dificuldade em interpretar problemas matemáticos",
+        "Melhora com organização visual (grades, espaçamento)"
+      ],
+      "other_observations": null
+    },
+    "support_response": [
+      {
+        "support_type": "worked_example_before",
+        "response": "yes_with_support"
+      },
+      {
+        "support_type": "fragmented_statement",
+        "response": "yes_with_support"
+      },
+      {
+        "support_type": "simplified_vocabulary",
+        "response": "yes_with_support"
+      },
+      {
+        "support_type": "smaller_numbers",
+        "response": "yes_with_support"
+      },
+      {
+        "support_type": "extra_time",
+        "response": "yes_with_support"
+      },
+      {
+        "support_type": "isolated_environment",
+        "response": "yes_with_support"
+      },
+      {
+        "support_type": "grid_lines",
+        "response": "yes_with_support"
+      },
+      {
+        "support_type": "visual_support",
+        "response": "yes_with_support"
+      },
+      {
+        "support_type": "metacognitive_hint",
+        "response": "yes_with_support"
+      },
+      {
+        "support_type": "fewer_alternatives",
+        "response": "yes_with_support"
+      }
+    ],
+    "adaptation_authorizations": [
+      {
+        "dimension": "statement_fragmentation",
+        "intensity": "intense"
+      },
+      {
+        "dimension": "language_simplification",
+        "intensity": "intense"
+      },
+      {
+        "dimension": "content_simplification",
+        "intensity": "intense"
+      },
+      {
+        "dimension": "metacognitive_hints",
+        "intensity": "moderate"
+      },
+      {
+        "dimension": "visual_support",
+        "intensity": "moderate"
+      },
+      {
+        "dimension": "alternatives_reduction",
+        "intensity": "moderate"
+      },
+      {
+        "dimension": "layout_intensity",
+        "intensity": "intense"
+      },
+      {
+        "dimension": "command_highlighting",
+        "intensity": "intense"
+      }
+    ],
+    "extra_time_authorized": true,
+    "specific_restrictions": null,
+    "personality_notes": "Estudante apresenta baixa autoestima — evitar redação que possa ser interpretada como infantilizante ou que torne visível que ele recebeu uma versão 'mais simples'. As adaptações devem preservar a forma adulta de se dirigir ao estudante.",
+    "aee_observations": {
+      "specific_strategies": "Questões curtas, enunciados diretos, comandos em destaque. Diretriz central: ao simplificar uma questão (ex.: exponencial), manter o construto avaliado — facilitar, mas manter a matéria.",
+      "material_resources": "Uso de imagens e suportes visuais simples (evitar tabelas densas). Leitor mediador presente que dá dicas orais.",
+      "other": null
+    },
+    "fill_metadata": {
+      "filled_jointly": true,
+      "justification": "Questionário preenchido em conjunto pela professora regente (Marcos Monte) e pelo AEE (Thaís)."
+    }
+  },
+  "laudo_summary": "TEA (suporte nível 2) com deficiência intelectual associada. Suporte intenso para interação social e compreensão de linguagem.",
+  "historical_data": null,
+  "_meta_persistencia": {
+    "aluno_id": "U1",
+    "source": "U1_intenso",
+    "saved_at": "2026-05-31T19:06:44.839409",
+    "filename": "U1_NEEI_v3_0_U1_intenso_20260531_190644.json"
+  }
+}

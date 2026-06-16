@@ -11,6 +11,7 @@ br-credentials.json
 providers_litellm.json
 agents_pool.json
 bancos_pool.json
+canais_email.json
 # ---- DADOS DE ALUNOS / BANCOS (LGPD) ----
 *.db
 banco_contexto/

@@ -51,6 +51,14 @@ try:
 except Exception:
     bmolde = None
 
+# P1: histórico de OCR no Postgres (leitura BD-first no PPO legado)
+try:
+    import backend_ocr_historico as _ocr_hist
+    _OCR_HIST_OK = True
+except Exception:
+    _ocr_hist = None
+    _OCR_HIST_OK = False
+
 
 # --- MODAL: NOVO ALUNO ---
 @st.dialog("🎒 Cadastrar Novo Aluno")
@@ -856,11 +864,27 @@ def render_ppo_tab(aluno_id):
         t = st.session_state['ultima_telemetria']
         st.info(f"📊 **IA:** {t.get('modelo', 'Gemini')} | **In:** {t.get('in', 0)} | **Out:** {t.get('out', 0)} | **Custo:** R$ {t.get('brl', 0):.4f}")
 
+    # P1 — LEITURA BD-FIRST: tenta o Postgres antes do arquivo em disco.
+    # Fallback automático pro ocr_cache_<aluno_id>.json se o BD não tiver.
     caminho_cache = f"ocr_cache_{aluno_id}.json"
-    if os.path.exists(caminho_cache):
-        with open(caminho_cache, "r", encoding="utf-8") as f:
-            ppo_data = json.load(f)
+    ppo_data = None
 
+    if _OCR_HIST_OK:
+        try:
+            registro_bd = _ocr_hist.ler_mais_recente(str(aluno_id))
+            if registro_bd is not None:
+                ppo_data = registro_bd["dados_json"]
+        except Exception:
+            pass
+
+    if ppo_data is None and os.path.exists(caminho_cache):
+        try:
+            with open(caminho_cache, "r", encoding="utf-8") as f:
+                ppo_data = json.load(f)
+        except Exception:
+            pass
+
+    if ppo_data is not None:
         for categoria, itens in ppo_data.items():
             # Pula metadados (_meta) — não é categoria
             if categoria.startswith("_"):

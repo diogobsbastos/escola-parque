@@ -38,12 +38,19 @@ def _registrar(view, label, import_path, func_name):
     _PAGINAS.append({"view": view, "label": label, "render": render})
 
 
-# ── PÁGINAS REGISTRADAS ──────────────────────────────────────────────────────
+# ── PÁGINAS REGISTRADAS ────────────────────────────────────────────────────
 _registrar(
     view="email",
     label="✉️ Configurar E-mail",
     import_path="pagina_email",
     func_name="render_pagina_email",
+)
+
+_registrar(
+    view="cadastros",
+    label="👤 Cadastro de Usuários",
+    import_path="pagina_cadastros",
+    func_name="render_pagina_cadastros",
 )
 
 

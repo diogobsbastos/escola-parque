@@ -66,6 +66,14 @@ try:
 except Exception:
     rag = None
 
+# P1: histórico de OCR no Postgres (dual-write + leitura BD-first)
+try:
+    import backend_ocr_historico as _ocr_hist
+    _OCR_HIST_OK = True
+except Exception:
+    _ocr_hist = None
+    _OCR_HIST_OK = False
+
 
 
 # ============================================================================
@@ -247,6 +255,18 @@ def _render_questionario_base_prof(professor_id):
                         with open(caminho_cache, "w", encoding="utf-8") as f:
                             json.dump(payload_legado, f, ensure_ascii=False, indent=4)
 
+                        # P1 — DUAL-WRITE: grava também no Postgres (histórico imutável).
+                        # Falha silenciosa: se o BD não estiver disponível, o disco continua.
+                        try:
+                            if _OCR_HIST_OK:
+                                _ocr_hist.inserir_resultado(
+                                    professor_id=str(professor_id),
+                                    dados=payload_legado,
+                                    molde=molde_usado,
+                                )
+                        except Exception:
+                            pass  # nunca quebra o fluxo principal
+
                         if bk and hasattr(bk, 'salvar_questionario_aluno'):
                             # CONTEXTO PROFESSOR: em vez de salvar como questionario de aluno,
                                 # associamos o molde escolhido a este professor.
@@ -291,11 +311,30 @@ def _render_questionario_base_prof(professor_id):
     # -----------------------------------------------------------------
     else:
         caminho_cache = f"ocr_cache_{professor_id}.json"
-        
-        if os.path.exists(caminho_cache):
-            with open(caminho_cache, "r", encoding="utf-8") as f:
-                dados_salvos = json.load(f)
 
+        # P1 — LEITURA BD-FIRST: tenta o Postgres antes do disco.
+        # Se não houver registro no BD, cai no arquivo local (fallback).
+        dados_salvos = None
+        _fonte = "nenhuma"
+
+        if _OCR_HIST_OK:
+            try:
+                registro_bd = _ocr_hist.ler_mais_recente(str(professor_id))
+                if registro_bd is not None:
+                    dados_salvos = registro_bd["dados_json"]
+                    _fonte = "bd"
+            except Exception:
+                pass
+
+        if dados_salvos is None and os.path.exists(caminho_cache):
+            try:
+                with open(caminho_cache, "r", encoding="utf-8") as f:
+                    dados_salvos = json.load(f)
+                _fonte = "disco"
+            except Exception:
+                pass
+
+        if dados_salvos is not None:
             with st.container(border=True): # Regra de Ouro 1[cite: 1]
                 col_txt, col_tgl = st.columns([4, 1])
                 with col_txt:
@@ -435,9 +474,6 @@ def _modal_novo_professor():
             st.rerun()
         except Exception as e:
             st.error(f"Falha ao cadastrar: {e}")
-
-
-
 
 
 @st.dialog("Novo Professor (Supabase BR)")

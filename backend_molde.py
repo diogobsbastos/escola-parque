@@ -10,18 +10,25 @@ Cada molde é um arquivo JSON em `moldes/<nome>.json` contendo:
   • âncoras fiduciais (cabeçalhos de seção) para alinhar provas novas
   • metadados (nome, criação, qtd de quadrados, fonte_pdf)
 
+Persistência (P0 — 2026-06-16):
+  • Fonte primária: tabela `moldes` no PostgreSQL local (asyncpg via innova_bridge)
+  • Fallback: disco local `moldes/` (mantido durante transição, nunca apagado auto.)
+  • Migração automática one-shot: ao detectar BD vazio + disco com moldes,
+    `migrar_disco_para_bd()` é chamada automaticamente por `listar_moldes()`.
+
 Funções principais:
-  listar_moldes() → ["Prova_Padrao_v1", ...]
+  listar_moldes()  → ["Prova_Padrao_v1", ...]
   carregar_molde(nome) → dict
-  salvar_molde(nome, dados) → bool
+  salvar_molde(nome, dados) → (bool, str, str)
   detectar_candidatos_para_molde(pdf_path) → {pag: [{x,y,w,h,score,stddev}, ...]}
   rasterizar_pagina(pdf_path, num_pag, dpi=200) → numpy BGR
+  migrar_disco_para_bd() → {"importados": N, "erros": [...]}
 ═══════════════════════════════════════════════════════════════════════════════
 """
 import os
 import json
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 try:
     import fitz       # PyMuPDF
@@ -30,6 +37,13 @@ try:
     VISAO_OK = True
 except ImportError:
     VISAO_OK = False
+
+# ── BD: asyncpg via innova_bridge ──────────────────────────────────────────
+try:
+    from innova_bridge.db.client import run_async, get_pool
+    _BD_IMPORT_OK = True
+except ImportError:
+    _BD_IMPORT_OK = False
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -324,7 +338,6 @@ def parse_gabarito_arquivo(conteudo_bytes: bytes, nome_arquivo: str):
         rotulo = "XLSX" if nome_lower.endswith(".xlsx") else "XLS"
         return True, saida, f"{len(saida)} frase(s) carregada(s) do {rotulo}."
 
-
     # ── TXT / MD (uma frase por linha) ──
     if nome_lower.endswith(".txt") or nome_lower.endswith(".md") or nome_lower == "":
         frases = []
@@ -356,9 +369,223 @@ def parse_gabarito_arquivo(conteudo_bytes: bytes, nome_arquivo: str):
     return False, [], f"Extensao '{nome_lower}' nao suportada. Use .json, .csv, .xlsx, .xls, .txt ou .md."
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# CAMADA BD — asyncpg (privado)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _bd_disponivel() -> bool:
+    """Retorna True se a conexão com o PostgreSQL está operacional."""
+    if not _BD_IMPORT_OK:
+        return False
+    try:
+        pool = run_async(get_pool())
+        return pool is not None
+    except Exception:
+        return False
+
+
+# ── helpers async internos ──────────────────────────────────────────────────
+
+async def _async_listar(pool) -> List[str]:
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT nome FROM moldes ORDER BY nome")
+        return [r["nome"] for r in rows]
+
+
+async def _async_carregar(pool, nome: str) -> Optional[Dict]:
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT dados_json FROM moldes WHERE nome = $1", nome
+        )
+        if row is None:
+            return None
+        val = row["dados_json"]
+        # asyncpg pode devolver dict ou str dependendo do codec registrado
+        if isinstance(val, str):
+            return json.loads(val)
+        return dict(val)
+
+
+async def _async_salvar(pool, nome: str, dados: Dict,
+                         pdf_bytes: Optional[bytes] = None) -> None:
+    versao         = str(dados.get("versao", "2.0"))
+    criado_em      = int(dados.get("criado_em", int(time.time())))
+    fonte_pdf      = str(dados.get("fonte_pdf", ""))
+    dpi_referencia = int(dados.get("dpi_referencia", DPI_PADRAO))
+    qtd_quadrados  = int(dados.get("qtd_quadrados", 0))
+    qtd_frases     = int(dados.get("qtd_frases_gabarito", 0))
+    template_layout = str(dados.get("template_layout", "multipla_escolha_esquerda"))
+    dados_str      = json.dumps(dados, ensure_ascii=False)
+
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO moldes
+                (nome, versao, criado_em, fonte_pdf, dpi_referencia,
+                 qtd_quadrados, qtd_frases, template_layout, dados_json, pdf_bytes)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
+            ON CONFLICT (nome) DO UPDATE SET
+                versao          = EXCLUDED.versao,
+                criado_em       = EXCLUDED.criado_em,
+                atualizado_em   = now(),
+                fonte_pdf       = EXCLUDED.fonte_pdf,
+                dpi_referencia  = EXCLUDED.dpi_referencia,
+                qtd_quadrados   = EXCLUDED.qtd_quadrados,
+                qtd_frases      = EXCLUDED.qtd_frases,
+                template_layout = EXCLUDED.template_layout,
+                dados_json      = EXCLUDED.dados_json,
+                pdf_bytes       = COALESCE(EXCLUDED.pdf_bytes, moldes.pdf_bytes)
+            """,
+            nome, versao, criado_em, fonte_pdf, dpi_referencia,
+            qtd_quadrados, qtd_frases, template_layout, dados_str, pdf_bytes,
+        )
+
+
+async def _async_atualizar_pdf(pool, nome: str, pdf_bytes: bytes) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE moldes SET pdf_bytes = $2, atualizado_em = now() WHERE nome = $1",
+            nome, pdf_bytes,
+        )
+
+
+async def _async_get_pdf(pool, nome: str) -> Optional[bytes]:
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT pdf_bytes FROM moldes WHERE nome = $1", nome
+        )
+        if row and row["pdf_bytes"]:
+            return bytes(row["pdf_bytes"])
+        return None
+
+
+async def _async_deletar(pool, nome: str) -> bool:
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "DELETE FROM moldes WHERE nome = $1", nome
+        )
+        return result != "DELETE 0"
+
+
+# ── wrappers síncronos (chamados pelas funções públicas) ───────────────────
+
+def _bd_listar() -> List[str]:
+    """SELECT nome FROM moldes. Retorna [] em caso de erro."""
+    try:
+        pool = run_async(get_pool())
+        return run_async(_async_listar(pool))
+    except Exception:
+        return []
+
+
+def _bd_carregar(nome: str) -> Optional[Dict]:
+    """Busca molde no BD pelo nome. Retorna None se não existir ou em erro."""
+    try:
+        pool = run_async(get_pool())
+        return run_async(_async_carregar(pool, nome))
+    except Exception:
+        return None
+
+
+def _bd_salvar(nome: str, dados: Dict,
+               pdf_bytes: Optional[bytes] = None) -> Tuple[bool, str]:
+    """INSERT / UPDATE do molde no BD. Retorna (ok, mensagem)."""
+    try:
+        pool = run_async(get_pool())
+        run_async(_async_salvar(pool, nome, dados, pdf_bytes))
+        return True, "Molde salvo no BD."
+    except Exception as e:
+        return False, f"BD erro: {type(e).__name__}: {e}"
+
+
+def _bd_atualizar_pdf(nome: str, pdf_bytes: bytes) -> None:
+    """Atualiza só a coluna pdf_bytes de um molde já existente. Best-effort."""
+    try:
+        pool = run_async(get_pool())
+        run_async(_async_atualizar_pdf(pool, nome, pdf_bytes))
+    except Exception:
+        pass
+
+
+def _bd_get_pdf(nome: str) -> Optional[bytes]:
+    """Recupera os bytes do PDF de referência do BD. Retorna None se ausente."""
+    try:
+        pool = run_async(get_pool())
+        return run_async(_async_get_pdf(pool, nome))
+    except Exception:
+        return None
+
+
+def _bd_deletar(nome: str) -> bool:
+    """DELETE do molde no BD. Retorna True se deletou algo."""
+    try:
+        pool = run_async(get_pool())
+        return run_async(_async_deletar(pool, nome))
+    except Exception:
+        return False
+
 
 # ═══════════════════════════════════════════════════════════════════════════
-# UTILITÁRIOS DE I/O DE MOLDES
+# MIGRAÇÃO DISCO → BD (one-shot, idempotente)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def migrar_disco_para_bd() -> Dict:
+    """Importa todos os moldes do disco local para o PostgreSQL.
+
+    Idempotente: usa ON CONFLICT(nome) DO NOTHING implícito via _bd_salvar
+    (que usa ON CONFLICT DO UPDATE, mas é seguro rodar N vezes — só atualiza).
+    Lê o PDF de referência correspondente (se existir) e salva como bytea.
+
+    Retorna:
+        {"importados": N, "sem_pdf": M, "erros": ["nome: mensagem", ...]}
+    """
+    garantir_pasta_moldes()
+    resultado = {"importados": 0, "sem_pdf": 0, "erros": []}
+
+    arquivos_json = [
+        f for f in os.listdir(PASTA_MOLDES)
+        if f.lower().endswith(".json") and not f.startswith(".")
+    ]
+
+    if not arquivos_json:
+        return resultado
+
+    for arquivo in sorted(arquivos_json):
+        nome = arquivo[:-5]  # remove .json
+        caminho_json = os.path.join(PASTA_MOLDES, arquivo)
+
+        # Lê o JSON do molde
+        try:
+            with open(caminho_json, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+        except Exception as e:
+            resultado["erros"].append(f"{nome}: falha ao ler JSON — {e}")
+            continue
+
+        # Lê o PDF de referência (se existir)
+        pdf_bytes = None
+        caminho_pdf = molde_pdf_path(nome)
+        if os.path.exists(caminho_pdf):
+            try:
+                with open(caminho_pdf, "rb") as f:
+                    pdf_bytes = f.read()
+            except Exception as e:
+                resultado["erros"].append(f"{nome}: PDF existe mas falhou ao ler — {e}")
+        else:
+            resultado["sem_pdf"] += 1
+
+        # Salva no BD
+        ok, msg = _bd_salvar(nome, dados, pdf_bytes)
+        if ok:
+            resultado["importados"] += 1
+        else:
+            resultado["erros"].append(f"{nome}: {msg}")
+
+    return resultado
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# UTILITÁRIOS DE I/O DE MOLDES (disco)
 # ═══════════════════════════════════════════════════════════════════════════
 def garantir_pasta_moldes() -> str:
     """Cria a pasta moldes/ se não existir. Retorna o caminho absoluto."""
@@ -408,18 +635,61 @@ def molde_path(nome: str) -> str:
     return os.path.join(PASTA_MOLDES, nome_limpo)
 
 
+def molde_pdf_path(nome: str) -> str:
+    """Caminho do PDF de referência associado ao molde (mesma pasta, mesma base).
+    O nome é SANITIZADO via _sanitizar_nome_filesystem antes de virar filename."""
+    nome_limpo = _sanitizar_nome_filesystem(nome)
+    if nome_limpo.lower().endswith(".json"):
+        nome_limpo = nome_limpo[:-5]
+    return os.path.join(PASTA_MOLDES, nome_limpo + ".pdf")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# FUNÇÕES PÚBLICAS DE I/O — BD-first com fallback para disco
+# ═══════════════════════════════════════════════════════════════════════════
+
 def listar_moldes() -> List[str]:
-    """Lista nomes (sem .json) dos moldes existentes em moldes/."""
+    """Lista nomes (sem .json) dos moldes disponíveis.
+
+    Estratégia:
+      1. Lê o disco para detectar moldes não migrados (fallback sempre ativo).
+      2. Se BD disponível: consulta tabela moldes.
+         • One-shot migration: BD vazio + disco com moldes → migra automaticamente.
+      3. Retorna união de BD + disco (deduplicado, ordenado).
+    """
     garantir_pasta_moldes()
-    arquivos = []
+
+    # ── Disco (fallback garantido) ──────────────────────────────────────
+    disco: set = set()
     for f in os.listdir(PASTA_MOLDES):
         if f.lower().endswith(".json") and not f.startswith("."):
-            arquivos.append(f[:-5])
-    return sorted(arquivos)
+            disco.add(f[:-5])
+
+    # ── BD ──────────────────────────────────────────────────────────────
+    bd_nomes: set = set()
+    if _bd_disponivel():
+        bd_nomes = set(_bd_listar())
+
+        # Migração automática one-shot
+        if len(bd_nomes) == 0 and len(disco) > 0:
+            migrar_disco_para_bd()
+            bd_nomes = set(_bd_listar())
+
+    return sorted(bd_nomes | disco)
 
 
 def carregar_molde(nome: str) -> Optional[Dict]:
-    """Carrega um molde do disco. Retorna None se não existir."""
+    """Carrega um molde pelo nome.
+
+    Estratégia: BD first → fallback disco legado.
+    """
+    # ── BD first ────────────────────────────────────────────────────────
+    if _bd_disponivel():
+        dados = _bd_carregar(nome)
+        if dados is not None:
+            return dados
+
+    # ── Fallback: disco ──────────────────────────────────────────────────
     path = molde_path(nome)
     if not os.path.exists(path):
         return None
@@ -430,19 +700,29 @@ def carregar_molde(nome: str) -> Optional[Dict]:
         return None
 
 
-def salvar_molde(nome: str, dados: Dict):
-    """Salva o molde em moldes/<nome>.json.
-    Retorna tupla (sucesso: bool, mensagem: str, path_absoluto: str)."""
+def salvar_molde(nome: str, dados: Dict) -> Tuple[bool, str, str]:
+    """Salva molde no BD + disco (disco mantido durante a transição).
+
+    Retorna tupla (sucesso: bool, mensagem: str, path_absoluto: str).
+    """
     garantir_pasta_moldes()
     path = molde_path(nome)
     path_abs = os.path.abspath(path)
+
+    # ── BD ──────────────────────────────────────────────────────────────
+    bd_ok = False
+    bd_msg = "BD indisponível"
+    if _bd_disponivel():
+        bd_ok, bd_msg = _bd_salvar(nome, dados)
+
+    # ── Disco (mantém compatibilidade) ──────────────────────────────────
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(dados, f, ensure_ascii=False, indent=2)
-        # Verifica realmente que o arquivo existe
         if os.path.exists(path):
             tamanho = os.path.getsize(path)
-            return True, f"OK · {tamanho} bytes gravados", path_abs
+            sufixo = " + BD ✓" if bd_ok else f" (BD: {bd_msg})"
+            return True, f"OK · {tamanho} bytes gravados{sufixo}", path_abs
         else:
             return False, "Arquivo não existe após gravação", path_abs
     except PermissionError as e:
@@ -454,14 +734,20 @@ def salvar_molde(nome: str, dados: Dict):
 
 
 def deletar_molde(nome: str) -> bool:
-    """Remove o arquivo do molde (JSON + PDF de referência, se existir)."""
+    """Remove o molde do BD e do disco. Retorna True se removeu de algum lugar."""
+    # ── BD ──────────────────────────────────────────────────────────────
+    bd_ok = False
+    if _bd_disponivel():
+        bd_ok = _bd_deletar(nome)
+
+    # ── Disco ────────────────────────────────────────────────────────────
     path_json = molde_path(nome)
     path_pdf  = molde_pdf_path(nome)
-    ok = False
+    disco_ok = False
     if os.path.exists(path_json):
         try:
             os.remove(path_json)
-            ok = True
+            disco_ok = True
         except Exception:
             pass
     if os.path.exists(path_pdf):
@@ -469,21 +755,15 @@ def deletar_molde(nome: str) -> bool:
             os.remove(path_pdf)
         except Exception:
             pass
-    return ok
+
+    return bd_ok or disco_ok
 
 
-def molde_pdf_path(nome: str) -> str:
-    """Caminho do PDF de referência associado ao molde (mesma pasta, mesma base).
-    O nome é SANITIZADO via _sanitizar_nome_filesystem antes de virar filename."""
-    nome_limpo = _sanitizar_nome_filesystem(nome)
-    if nome_limpo.lower().endswith(".json"):
-        nome_limpo = nome_limpo[:-5]
-    return os.path.join(PASTA_MOLDES, nome_limpo + ".pdf")
+def salvar_pdf_referencia(nome: str, pdf_path_origem: str) -> Tuple[bool, str, str]:
+    """Copia o PDF temporário para moldes/<nome>.pdf E salva bytes no BD.
 
-
-def salvar_pdf_referencia(nome: str, pdf_path_origem: str):
-    """Copia o PDF temporário para moldes/<nome>.pdf, virando referência permanente.
-    Retorna tupla (sucesso, mensagem, path_destino)."""
+    Retorna tupla (sucesso, mensagem, path_destino).
+    """
     import shutil
     garantir_pasta_moldes()
     destino = molde_pdf_path(nome)
@@ -492,16 +772,35 @@ def salvar_pdf_referencia(nome: str, pdf_path_origem: str):
         if not os.path.exists(pdf_path_origem):
             return False, f"PDF origem não existe: {pdf_path_origem}", destino_abs
         shutil.copy2(pdf_path_origem, destino)
-        if os.path.exists(destino):
-            return True, f"PDF copiado · {os.path.getsize(destino)} bytes", destino_abs
-        return False, "Falha desconhecida na cópia", destino_abs
+        if not os.path.exists(destino):
+            return False, "Falha desconhecida na cópia", destino_abs
+
+        tamanho = os.path.getsize(destino)
+
+        # ── Salva bytes no BD (best-effort) ─────────────────────────────
+        bd_sufixo = ""
+        if _bd_disponivel():
+            try:
+                with open(destino, "rb") as f:
+                    pdf_bytes = f.read()
+                _bd_atualizar_pdf(nome, pdf_bytes)
+                bd_sufixo = " + BD ✓"
+            except Exception as e:
+                bd_sufixo = f" (BD PDF falhou: {type(e).__name__})"
+
+        return True, f"PDF copiado · {tamanho} bytes{bd_sufixo}", destino_abs
     except Exception as e:
         return False, f"Exceção: {type(e).__name__}: {e}", destino_abs
 
 
 def existe_pdf_referencia(nome: str) -> bool:
-    """Verifica se há um PDF de referência salvo para esse molde."""
-    return os.path.exists(molde_pdf_path(nome))
+    """Verifica se há PDF de referência: disco OU BD."""
+    if os.path.exists(molde_pdf_path(nome)):
+        return True
+    if _bd_disponivel():
+        pdf = _bd_get_pdf(nome)
+        return pdf is not None
+    return False
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -816,8 +1115,20 @@ def carregar_para_edicao(nome: str):
         return {"erro": f"Molde '{nome}' não encontrado."}
 
     pdf_ref = molde_pdf_path(nome)
-    if not os.path.exists(pdf_ref):
-        return {"erro": f"PDF de referência não encontrado em '{pdf_ref}'. Suba o PDF original novamente."}
+
+    # Se o PDF não estiver em disco, tenta recuperar do BD e gravar temporariamente
+    if not os.path.exists(pdf_ref) and _bd_disponivel():
+        pdf_bytes = _bd_get_pdf(nome)
+        if pdf_bytes:
+            try:
+                garantir_pasta_moldes()
+                with open(pdf_ref, "wb") as f:
+                    f.write(pdf_bytes)
+            except Exception:
+                pdf_ref = None  # falhou ao escrever — continuará dando erro abaixo
+
+    if not pdf_ref or not os.path.exists(pdf_ref):
+        return {"erro": f"PDF de referência não encontrado em '{molde_pdf_path(nome)}'. Suba o PDF original novamente."}
 
     # Rasteriza as páginas do PDF de referência
     paginas_bgr = rasterizar_todas(pdf_ref, dpi=molde.get("dpi_referencia", DPI_PADRAO))
@@ -853,4 +1164,3 @@ def carregar_para_edicao(nome: str):
         "frases":     frases_custom,
         "pdf_path":   os.path.abspath(pdf_ref),
     }
-

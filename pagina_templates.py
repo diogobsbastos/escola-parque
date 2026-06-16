@@ -7,9 +7,9 @@ template aponta a `main` para o HEAD da branch escolhida (via API do GitHub) e
 a VPS redeploya em ~2 min. O build-gate protege: se o template novo não buildar,
 a produção continua no atual.
 
-Requisito p/ o botão Ativar funcionar sozinho: variável de ambiente
-`GITHUB_TOKEN` (ou `GH_TOKEN`) no serviço `escolaparque`. Sem ela, a página
-mostra o estado e o caminho manual.
+Token: REUSA a credencial que a VPS já usa (não precisa criar token novo).
+Procura em ordem: env GITHUB_TOKEN/GH_TOKEN -> ~/.git-credentials -> URL do
+remote dos repos locais. Precisa ter permissão de escrita (Contents: write).
 """
 
 import os
@@ -21,6 +21,16 @@ import streamlit as st
 REPO_OWNER = "diogobsbastos"
 REPO_FRONT = "escola-parque-frontend"
 ESTADO = os.path.join(os.path.dirname(__file__), "_template_ativo.json")
+
+# Locais onde a credencial do GitHub pode já estar na VPS.
+_GIT_CRED_PATHS = [
+    os.path.expanduser("~/.git-credentials"),
+    "/home/ubuntu/.git-credentials",
+]
+_GIT_CONFIGS = [
+    "/home/ubuntu/innova-front/.git/config",
+    "/home/ubuntu/escola-parque/.git/config",
+]
 
 TEMPLATES = [
     {
@@ -38,8 +48,46 @@ TEMPLATES = [
 ]
 
 
+def _extrair_token_de_url(linha: str) -> str:
+    """De 'https://user:token@github.com...' ou 'https://token@github.com...' tira o token."""
+    try:
+        if "://" in linha and "@" in linha:
+            cred = linha.split("://", 1)[1].split("@", 1)[0]
+            return cred.split(":")[-1].strip()
+    except Exception:
+        pass
+    return ""
+
+
 def _token():
-    return os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
+    # 1) variável de ambiente
+    t = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if t:
+        return t.strip()
+    # 2) ~/.git-credentials (credential store do git)
+    for p in _GIT_CRED_PATHS:
+        try:
+            with open(p, encoding="utf-8") as f:
+                for linha in f:
+                    if "github.com" in linha:
+                        tok = _extrair_token_de_url(linha.strip())
+                        if tok:
+                            return tok
+        except Exception:
+            continue
+    # 3) URL do remote nos repos locais (caso o token esteja embutido na URL)
+    for cfg in _GIT_CONFIGS:
+        try:
+            with open(cfg, encoding="utf-8") as f:
+                for linha in f:
+                    linha = linha.strip()
+                    if linha.startswith("url") and "github.com" in linha:
+                        tok = _extrair_token_de_url(linha)
+                        if tok:
+                            return tok
+        except Exception:
+            continue
+    return ""
 
 
 def _ler_ativo():
@@ -73,10 +121,10 @@ def _branch_head(branch, token):
 def _ativar(template):
     token = _token()
     if not token:
-        return False, "Sem GITHUB_TOKEN no ambiente do serviço — não consigo trocar sozinho."
+        return False, "Não encontrei credencial do GitHub na VPS (env, ~/.git-credentials ou remote)."
     sha = _branch_head(template["branch"], token)
     if not sha:
-        return False, f"Não encontrei a branch `{template['branch']}` no GitHub."
+        return False, f"Não encontrei a branch `{template['branch']}` (ou o token não tem acesso)."
     r = requests.patch(
         f"https://api.github.com/repos/{REPO_OWNER}/{REPO_FRONT}/git/refs/heads/main",
         headers=_headers(token), json={"sha": sha, "force": True}, timeout=20,
@@ -100,9 +148,9 @@ def render_pagina_templates():
 
     if not _token():
         st.warning(
-            "⚠️ Sem `GITHUB_TOKEN` no ambiente do serviço `escolaparque` — o botão **Ativar** "
-            "não troca sozinho. Configure o token no systemd (Environment=GITHUB_TOKEN=...) "
-            "que aí a troca passa a ser 1 clique."
+            "⚠️ Não localizei a credencial do GitHub que a VPS usa (env / `~/.git-credentials` / "
+            "remote). Sem ela o **Ativar** não troca sozinho. Me avise que a gente aponta a página "
+            "pro lugar certo da credencial."
         )
 
     for t in TEMPLATES:

@@ -53,5 +53,12 @@ _registrar(
     func_name="render_pagina_cadastros",
 )
 
+_registrar(
+    view="templates",
+    label="🎨 Templates",
+    import_path="pagina_templates",
+    func_name="render_pagina_templates",
+)
+
 
 PAGINAS_EXTRAS = _PAGINAS

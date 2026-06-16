@@ -7,9 +7,12 @@ NAO importa respostas de alunos - isso vive em ALUNO > Questionario Base.
 Mostra:
   - Lista de schemas declarativos disponiveis (NEEI v2.0, futuros)
   - Editor visual via botao 👁 (3 abas: Mapping, Value Maps, Metadata)
+
+v2 (2026-06-16): _listar_schemas() substituida por backend_formularios.listar_schemas().
+  O schema "ativo" agora vem do BD (flag ativo=TRUE), nao mais do "primeiro arquivo da lista".
 """
 from __future__ import annotations
-import json
+
 from pathlib import Path
 
 import streamlit as st
@@ -22,28 +25,71 @@ except Exception as _e_editor:
     _EDITOR_OK = False
     _EDITOR_ERR = str(_e_editor)
 
+try:
+    import backend_formularios as _bf
+    _BF_OK = True
+except Exception as _e_bf:
+    _bf = None  # type: ignore
+    _BF_OK = False
+
 SCHEMAS_DIR = Path(__file__).resolve().parent / "innova_bridge" / "formularios" / "schemas"
 
 
 def _listar_schemas():
-    """Retorna lista de schemas declarativos disponiveis."""
+    """
+    Retorna lista de schemas. BD-first via backend_formularios; fallback disco.
+    Cada item tem: nome, versao (schema_version), titulo (title), n_fields,
+                   produzido_em (produced_at), ativo (bool), path (para o editor).
+    """
+    if _BF_OK:
+        try:
+            schemas_bd = _bf.listar_schemas()
+            resultado = []
+            for sc in schemas_bd:
+                nome = sc.get("nome", "")
+                path_disco = str(SCHEMAS_DIR / f"{nome}.json")
+                resultado.append({
+                    "id":             sc.get("id"),
+                    "nome":           nome,
+                    "filename":       f"{nome}.json",
+                    "path":           path_disco,
+                    "schema_version": sc.get("versao", nome),
+                    "title":          sc.get("titulo", nome),
+                    "produced_at":    sc.get("produzido_em", "-"),
+                    "n_fields":       sc.get("n_fields", 0),
+                    "ativo":          sc.get("ativo", False),
+                })
+            return resultado
+        except Exception as e:
+            st.warning(f"⚠️ backend_formularios indisponivel ({e}). Usando disco.")
+
+    # Fallback disco (comportamento pre-BD)
+    import json
     if not SCHEMAS_DIR.exists():
         return []
     schemas = []
-    for arq in sorted(SCHEMAS_DIR.glob("*.json")):
+    for i, arq in enumerate(sorted(SCHEMAS_DIR.glob("*.json"))):
+        if arq.suffix != ".json":
+            continue
         try:
             with open(arq, "r", encoding="utf-8") as f:
                 data = json.load(f)
             schemas.append({
-                "path": str(arq),
-                "filename": arq.name,
+                "id":             None,
+                "nome":           arq.stem,
+                "filename":       arq.name,
+                "path":           str(arq),
                 "schema_version": data.get("schema_version", arq.stem),
-                "title": data.get("title", arq.stem),
-                "produced_at": data.get("produced_at", "-"),
-                "n_fields": len(data.get("mapping", {})),
+                "title":          data.get("title", arq.stem),
+                "produced_at":    data.get("produced_at", "-"),
+                "n_fields":       len(data.get("mapping", {})),
+                "ativo":          (i == 0),
             })
         except Exception as e:
-            schemas.append({"path": str(arq), "filename": arq.name, "erro": str(e)})
+            schemas.append({
+                "id": None, "nome": arq.stem, "filename": arq.name,
+                "path": str(arq), "ativo": False, "erro": str(e),
+            })
     return schemas
 
 
@@ -88,7 +134,6 @@ def _card_schema(schema: dict, em_uso: bool) -> None:
 def render_pagina_formularios() -> None:
     """Funcao publica chamada pelo app.py."""
 
-    # Cabecalho
     col_titulo, col_badge = st.columns([3, 1])
     with col_titulo:
         st.title("Formulários")
@@ -109,11 +154,10 @@ def render_pagina_formularios() -> None:
 
     schemas = _listar_schemas()
     if not schemas:
-        st.warning("Nenhum schema cadastrado em innova_bridge/formularios/schemas/")
+        st.warning("Nenhum schema cadastrado.")
         st.info("Crie um arquivo JSON declarativo (ex: neei_v2_0.json) para começar.")
         return
 
     st.markdown("### Schemas cadastrados")
-    em_uso_default = schemas[0]["filename"]
     for sc in schemas:
-        _card_schema(sc, em_uso=(sc["filename"] == em_uso_default))
+        _card_schema(sc, em_uso=sc.get("ativo", False))

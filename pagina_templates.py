@@ -7,22 +7,21 @@ template aponta a `main` para o HEAD da branch escolhida (via API do GitHub) e
 a VPS redeploya em ~2 min. O build-gate protege: se o template novo não buildar,
 a produção continua no atual.
 
-Token: REUSA a credencial que a VPS já usa (não precisa criar token novo).
-Procura em ordem: env GITHUB_TOKEN/GH_TOKEN -> ~/.git-credentials -> URL do
-remote dos repos locais. Precisa ter permissão de escrita (Contents: write).
+O template ATIVO é detectado comparando o HEAD da `main` com o HEAD de cada
+branch — fonte de verdade real (não depende de arquivo local).
+
+Token: REUSA a credencial que a VPS já usa (env GITHUB_TOKEN/GH_TOKEN ->
+~/.git-credentials -> URL do remote dos repos locais). Precisa de Contents:write.
 """
 
 import os
-import json
 
 import requests
 import streamlit as st
 
 REPO_OWNER = "diogobsbastos"
 REPO_FRONT = "escola-parque-frontend"
-ESTADO = os.path.join(os.path.dirname(__file__), "_template_ativo.json")
 
-# Locais onde a credencial do GitHub pode já estar na VPS.
 _GIT_CRED_PATHS = [
     os.path.expanduser("~/.git-credentials"),
     "/home/ubuntu/.git-credentials",
@@ -43,13 +42,13 @@ TEMPLATES = [
         "id": "novo",
         "nome": "Template Novo (Tailwind + Radix)",
         "branch": "feat/materio-migration",
-        "desc": "Migração nova: Base UI removido, stack Tailwind + Radix. Independente do atual.",
+        "desc": "Refactor interno: Base UI removido, stack Tailwind + Radix. "
+                "Mesmo visual do atual (ainda sem design Materio aplicado).",
     },
 ]
 
 
 def _extrair_token_de_url(linha: str) -> str:
-    """De 'https://user:token@github.com...' ou 'https://token@github.com...' tira o token."""
     try:
         if "://" in linha and "@" in linha:
             cred = linha.split("://", 1)[1].split("@", 1)[0]
@@ -60,11 +59,9 @@ def _extrair_token_de_url(linha: str) -> str:
 
 
 def _token():
-    # 1) variável de ambiente
     t = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if t:
         return t.strip()
-    # 2) ~/.git-credentials (credential store do git)
     for p in _GIT_CRED_PATHS:
         try:
             with open(p, encoding="utf-8") as f:
@@ -75,7 +72,6 @@ def _token():
                             return tok
         except Exception:
             continue
-    # 3) URL do remote nos repos locais (caso o token esteja embutido na URL)
     for cfg in _GIT_CONFIGS:
         try:
             with open(cfg, encoding="utf-8") as f:
@@ -90,32 +86,36 @@ def _token():
     return ""
 
 
-def _ler_ativo():
-    try:
-        with open(ESTADO, encoding="utf-8") as f:
-            return json.load(f).get("ativo")
-    except Exception:
-        return None
-
-
-def _salvar_ativo(tid):
-    try:
-        with open(ESTADO, "w", encoding="utf-8") as f:
-            json.dump({"ativo": tid}, f)
-    except Exception:
-        pass
-
-
 def _headers(token):
     return {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
 
 
 def _branch_head(branch, token):
-    r = requests.get(
-        f"https://api.github.com/repos/{REPO_OWNER}/{REPO_FRONT}/git/ref/heads/{branch}",
-        headers=_headers(token), timeout=20,
-    )
-    return r.json()["object"]["sha"] if r.status_code == 200 else None
+    try:
+        r = requests.get(
+            f"https://api.github.com/repos/{REPO_OWNER}/{REPO_FRONT}/git/ref/heads/{branch}",
+            headers=_headers(token), timeout=20,
+        )
+        return r.json()["object"]["sha"] if r.status_code == 200 else None
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _estado(_token_hash):
+    """Retorna (id_ativo, main_sha, {branch: sha}). Cacheado 30s p/ não bater na API a cada rerun."""
+    token = _token()
+    if not token:
+        return None, None, {}
+    main_sha = _branch_head("main", token)
+    mapa = {t["branch"]: _branch_head(t["branch"], token) for t in TEMPLATES}
+    ativo = None
+    if main_sha:
+        for t in TEMPLATES:
+            if mapa.get(t["branch"]) == main_sha:
+                ativo = t["id"]
+                break
+    return ativo, main_sha, mapa
 
 
 def _ativar(template):
@@ -130,7 +130,7 @@ def _ativar(template):
         headers=_headers(token), json={"sha": sha, "force": True}, timeout=20,
     )
     if r.status_code in (200, 201):
-        _salvar_ativo(template["id"])
+        _estado.clear()
         return True, (f"`main` agora aponta para `{template['branch']}` ({sha[:7]}). "
                       "A VPS redeploya em ~2 min — se o build passar.")
     return False, f"GitHub {r.status_code}: {r.text[:200]}"
@@ -144,14 +144,17 @@ def render_pagina_templates():
         "a produção continua no atual."
     )
 
-    ativo = _ler_ativo()
+    tem_token = bool(_token())
+    if not tem_token:
+        st.warning("⚠️ Não localizei a credencial do GitHub que a VPS usa. Me avise que eu aponto a página pro lugar certo.")
 
-    if not _token():
-        st.warning(
-            "⚠️ Não localizei a credencial do GitHub que a VPS usa (env / `~/.git-credentials` / "
-            "remote). Sem ela o **Ativar** não troca sozinho. Me avise que a gente aponta a página "
-            "pro lugar certo da credencial."
-        )
+    ativo, main_sha, mapa = _estado(tem_token)
+    if main_sha:
+        st.caption(f"`main` está em `{main_sha[:7]}`" + (" — nenhum template casado exatamente" if not ativo else ""))
+
+    if st.button("🔄 Recarregar estado", use_container_width=False):
+        _estado.clear()
+        st.rerun()
 
     for t in TEMPLATES:
         with st.container(border=True):
@@ -160,7 +163,8 @@ def render_pagina_templates():
                 marca = " ✅ **ATIVO**" if ativo == t["id"] else ""
                 st.markdown(f"### {t['nome']}{marca}")
                 st.caption(t["desc"])
-                st.caption(f"branch: `{t['branch']}`")
+                _sha = mapa.get(t["branch"])
+                st.caption(f"branch: `{t['branch']}`" + (f" · `{_sha[:7]}`" if _sha else ""))
             with c2:
                 st.write("")
                 st.write("")

@@ -1,3 +1,28 @@
+################################################################################
+# REGRA 0 — POLÍTICA DE MODELO (LEI DO ESCOLA PARQUE · VALE EM TODOS OS CHATS)
+################################################################################
+# Definida por Marcos Alves em 2026-06-16. Mandatória, sem exceção, em QUALQUER
+# chat/sessão (Cowork ou não) que toque o ecossistema Escola Parque.
+#
+# PRINCÍPIO: "Opus na régua, Sonnet no braço."
+#   - OPUS  = administração: arquitetura, decisões, contratos de API, revisão
+#             final e pontos de alto risco. Mantém a thread principal LEVE.
+#   - SONNET = execução em volume: leitura de arquivos grandes, varredura de
+#              código, rascunho de boilerplate, geração de migrações,
+#              implementação das fases. SEMPRE que o trabalho for delegável,
+#              vai para um sub-agente em Sonnet.
+#
+# REGRAS PRÁTICAS:
+#   1. NÃO reler arquivos gigantes na thread Opus. Delegar a leitura a um
+#      sub-agente Sonnet e receber só o resumo/contratos.
+#   2. Fases de execução (implementação) rodam majoritariamente em Sonnet;
+#      Opus entra só na arquitetura e na verificação final.
+#   3. Minimizar tokens/custo é objetivo de primeira ordem — preferir blocos
+#      cirúrgicos a despejos de código completo (ver também Regra de Ouro abaixo).
+#   4. Toda execução de LLM do produto continua logada em agent_run_logs
+#      (custo_brl/custo_usd) — telemetria de gasto é não-opcional.
+################################################################################
+
 ================================================================================
 DOCUMENTO DE ESPECIFICAÇÃO TÉCNICA E DIRETRIZES DE IA
 PROJETO: ESCOLA PARQUE V3 - SURGICAL RAG (MIGRAÇÃO DE INFRAESTRUTURA LITELLM)

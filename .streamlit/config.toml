@@ -1,0 +1,7 @@
+[client]
+# Esconde o menu nativo de paginas do Streamlit (pages/). A navegacao do
+# Backend Central e a sidebar custom do app.py (Maestro), nao o menu nativo.
+showSidebarNavigation = false
+
+[theme]
+base = "light"

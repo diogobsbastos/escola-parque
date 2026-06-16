@@ -107,6 +107,22 @@ except ImportError:
     def render_pagina_config_bd():
         st.error("Módulo do Carrossel de BD não carregado. Verifique pagina_config_bd.py e storage_bancos.py.")
 
+# --- [F2] IMPORTS DAS PAGINAS DE COLEGIOS E INICIO ---
+try:
+    from pagina_colegios import render_pagina_colegios
+except Exception as _e_col:
+    st.warning(f"Aviso: 'pagina_colegios.py' nao carregado ({type(_e_col).__name__}).")
+    def render_pagina_colegios():
+        st.error("Modulo de Colegios inoperante.")
+
+try:
+    from pagina_home import render_pagina_home
+except Exception as _e_home:
+    st.warning(f"Aviso: 'pagina_home.py' nao carregado ({type(_e_home).__name__}).")
+    def render_pagina_home():
+        st.error("Modulo de Inicio inoperante.")
+
+
 # --- [NOVO] IMPORTS DO POOL LITELLM (MULTI-PROVEDOR) ---
 try:
     from storage_litellm import (
@@ -213,7 +229,7 @@ if 'modelo_ativo' not in st.session_state:
         st.session_state['modelo_ativo'] = "gemini-1.5-flash"
 
 if 'view_mode' not in st.session_state:
-    st.session_state['view_mode'] = 'alunos'
+    st.session_state['view_mode'] = 'home'
 
 if 'lista_modelos' not in st.session_state:
     st.session_state['lista_modelos'] = []
@@ -1546,7 +1562,13 @@ with st.sidebar:
     except Exception:
         st.warning("🧠 Backend Central: status indisponível", icon="⚠️")
 
+    st.link_button("↩️ Voltar para o Frontend", "https://escolaparque-app.duckdns.org", use_container_width=True)
+
     st.divider()
+
+    if st.button("🏠 Início", type="primary" if st.session_state['view_mode'] == 'home' else "secondary", use_container_width=True):
+        st.session_state['view_mode'] = 'home'
+        st.rerun()
 
     if st.button("👥 Área de Alunos", type="primary" if st.session_state['view_mode'] == 'alunos' else "secondary", use_container_width=True):
         st.session_state['view_mode'] = 'alunos'
@@ -1554,6 +1576,10 @@ with st.sidebar:
 
     if st.button("👨‍🏫 Professores", type="primary" if st.session_state['view_mode'] == 'professores' else "secondary", use_container_width=True):
         st.session_state['view_mode'] = 'professores'
+        st.rerun()
+
+    if st.button("🏫 Colégios", type="primary" if st.session_state['view_mode'] == 'colegios' else "secondary", use_container_width=True):
+        st.session_state['view_mode'] = 'colegios'
         st.rerun()
 
     if st.button("📝 Motor de Avaliações", type="primary" if st.session_state['view_mode'] == 'motor' else "secondary", use_container_width=True):
@@ -1663,3 +1689,9 @@ elif st.session_state['view_mode'] == 'agentes':
 
 elif st.session_state['view_mode'] == 'professores':
     render_pagina_professores()
+
+elif st.session_state['view_mode'] == 'colegios':
+    render_pagina_colegios()
+
+elif st.session_state['view_mode'] == 'home':
+    render_pagina_home()

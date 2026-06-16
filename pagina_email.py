@@ -121,11 +121,27 @@ def render_pagina_email():
     )
 
     if tipo == "gmail":
-        st.info(
-            "Para Gmail você precisa de uma **App-password** (não a senha normal): "
-            "ative a verificação em 2 etapas na conta Google e gere uma senha de app "
-            "em myaccount.google.com → Segurança → Senhas de app. Cole os 16 dígitos abaixo."
-        )
+        with st.expander("📖 Como gerar a App-password do Gmail (passo a passo)", expanded=True):
+            st.markdown(
+                "O Gmail **não** aceita a sua senha normal aqui — ele exige uma "
+                "**App-password**: uma senha de 16 letras só pra aplicativos. Faça assim:\n\n"
+                "1. A conta Google precisa ter a **verificação em 2 etapas** ligada.\n"
+                "2. Clique no botão abaixo pra abrir a página **Senhas de app** do Google.\n"
+                "3. Em *Nome do app*, escreva `Escola Parque` e clique **Criar**.\n"
+                "4. O Google mostra **16 letras** (ex.: `abcd efgh ijkl mnop`).\n"
+                "5. Cole essas 16 letras no campo **Senha / App-password** aqui embaixo "
+                "(pode ser com ou sem espaços).\n"
+                "6. No campo **Usuário**, coloque o seu e-mail Gmail completo."
+            )
+            st.link_button(
+                "🔗 Abrir página de Senhas de app do Google",
+                "https://myaccount.google.com/apppasswords",
+                use_container_width=True,
+            )
+            st.caption(
+                "Se a página disser que a opção não está disponível, é porque a "
+                "verificação em 2 etapas ainda não está ativada na conta."
+            )
 
     with st.form(key="add_canal"):
         nome = st.text_input("Nome do canal", placeholder="Ex.: Gmail Secretaria")

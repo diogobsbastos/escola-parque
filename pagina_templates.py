@@ -33,17 +33,22 @@ _GIT_CONFIGS = [
 
 TEMPLATES = [
     {
-        "id": "atual",
-        "nome": "Template Atual (v1)",
-        "branch": "template-v1-backup",
-        "desc": "Template original (Tailwind + Base UI). Estável, é o que rodou até hoje.",
+        "id": "antigo",
+        "nome": "Template Antigo",
+        "branch": "template-antigo",
+        "desc": "O original da Escola Parque (burgundy + Base UI). Estável.",
     },
     {
-        "id": "novo",
-        "nome": "Template Novo (Tailwind + Radix)",
-        "branch": "feat/materio-migration",
-        "desc": "Refactor interno: Base UI removido, stack Tailwind + Radix. "
-                "Mesmo visual do atual (ainda sem design Materio aplicado).",
+        "id": "intermediario",
+        "nome": "Template Intermediário",
+        "branch": "template-intermediario",
+        "desc": "Materio feito no chat: Tailwind + Radix, claro/roxo. O 'novo' que construímos juntos.",
+    },
+    {
+        "id": "claude-design",
+        "nome": "Template Claude Design",
+        "branch": "template-claude-design",
+        "desc": "Tudo do Claude Design: paleta magenta por modo, login-v1 e editor de cores por colégio.",
     },
 ]
 

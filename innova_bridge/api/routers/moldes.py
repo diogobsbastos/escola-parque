@@ -262,6 +262,7 @@ async def obter_molde(
 async def detectar_candidatos(
     pdf: UploadFile = File(...),
     hibrido: bool = Form(False),
+    threshold: float = Form(0.60),
     _user: Dict = Depends(usuario_autenticado),
 ):
     """
@@ -272,6 +273,8 @@ async def detectar_candidatos(
 
     hibrido: quando True, busca caixas em toda a largura da página (x_max_pct=0.98)
              em vez dos 20% da esquerda (comportamento padrão).
+    threshold: limiar mínimo de correlação para aceitar um match (0.0–1.0).
+               Default 0.60. Valores mais altos reduzem falsos-positivos de letras.
 
     # TODO: mover para threadpool se necessário (funções de backend são síncronas).
     """
@@ -302,9 +305,9 @@ async def detectar_candidatos(
             f.write(conteudo)
 
         if hibrido:
-            resultado = bm.detectar_candidatos_para_molde(tmp_path, x_max_pct=0.98)
+            resultado = bm.detectar_candidatos_para_molde(tmp_path, x_max_pct=0.98, threshold=threshold)
         else:
-            resultado = bm.detectar_candidatos_para_molde(tmp_path)
+            resultado = bm.detectar_candidatos_para_molde(tmp_path, threshold=threshold)
 
         if "erro" in resultado:
             raise HTTPException(

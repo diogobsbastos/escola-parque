@@ -899,7 +899,8 @@ def _stddev_faixa_direita(img_gs, x, y, w, h, largura=250):
 def detectar_candidatos_para_molde(pdf_path: str,
                                     template_path: str = None,
                                     dpi: int = DPI_PADRAO,
-                                    x_max_pct: float = 0.20) -> Dict:
+                                    x_max_pct: float = 0.20,
+                                    threshold: float = 0.60) -> Dict:
     """
     Detecta TODOS os candidatos (sem filtro) usando template matching.
     Retorna dict com:
@@ -911,6 +912,8 @@ def detectar_candidatos_para_molde(pdf_path: str,
     x_max_pct: fração da largura da página até onde a busca por caixas é feita.
                Default 0.20 (20% — comportamento original). Use 0.98 para
                detecção híbrida em toda a largura da página.
+    threshold: limiar mínimo de correlação para aceitar um match (0.0–1.0).
+               Default 0.60. Valores mais altos reduzem falsos-positivos de letras.
     """
     if not VISAO_OK:
         return {"erro": "OpenCV/PyMuPDF/NumPy ausentes"}
@@ -933,7 +936,8 @@ def detectar_candidatos_para_molde(pdf_path: str,
     for npag, img_bgr in paginas_bgr.items():
         img_gs = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
         for (x, y, w, h, sc) in _localizar_via_template(img_gs, template_gs,
-                                                          x_max_pct=x_max_pct):
+                                                          x_max_pct=x_max_pct,
+                                                          threshold=threshold):
             std = _stddev_faixa_direita(img_gs, x, y, w, h)
             candidatos.append({
                 "pag": int(npag), "x": int(x), "y": int(y),

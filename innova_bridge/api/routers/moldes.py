@@ -24,7 +24,7 @@ import os
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
 # Importação defensiva do OpenCV — pode não estar instalado no ambiente mínimo
@@ -261,6 +261,7 @@ async def obter_molde(
 @router.post("/detectar", response_model=DetectarResponse)
 async def detectar_candidatos(
     pdf: UploadFile = File(...),
+    hibrido: bool = Form(False),
     _user: Dict = Depends(usuario_autenticado),
 ):
     """
@@ -268,6 +269,9 @@ async def detectar_candidatos(
 
     Retorna por página: imagem PNG em base64 + lista de candidatos com
     posição (x, y, w, h) e métricas de qualidade (score, stddev).
+
+    hibrido: quando True, busca caixas em toda a largura da página (x_max_pct=0.98)
+             em vez dos 20% da esquerda (comportamento padrão).
 
     # TODO: mover para threadpool se necessário (funções de backend são síncronas).
     """
@@ -297,7 +301,10 @@ async def detectar_candidatos(
         with open(tmp_path, "wb") as f:
             f.write(conteudo)
 
-        resultado = bm.detectar_candidatos_para_molde(tmp_path)
+        if hibrido:
+            resultado = bm.detectar_candidatos_para_molde(tmp_path, x_max_pct=0.98)
+        else:
+            resultado = bm.detectar_candidatos_para_molde(tmp_path)
 
         if "erro" in resultado:
             raise HTTPException(

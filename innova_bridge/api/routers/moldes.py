@@ -10,6 +10,7 @@ Endpoints existentes:
   GET  /api/v1/moldes                Lista todos os nomes de moldes disponíveis.
   GET  /api/v1/moldes/{nome}         Retorna o dict completo de um molde.
   POST /api/v1/moldes/detectar       Recebe PDF, roda detecção OpenCV, retorna candidatos + imagens base64.
+  POST /api/v1/moldes/ocr-regiao     Extrai texto de uma região de um PDF digital via PyMuPDF.
 
 Endpoints novos (Sessões Dinâmicas — exam_templates):
   POST /api/v1/moldes/templates              Salva novo template no formato 3.0-Sessões.
@@ -33,6 +34,15 @@ try:
     _CV2_OK = True
 except ImportError:
     _CV2_OK = False
+
+# Importação defensiva do PyMuPDF — usado para OCR de PDFs digitais
+try:
+    import fitz  # PyMuPDF
+    _FITZ_OK = True
+    _FITZ_ERRO = ""
+except Exception as e:
+    _FITZ_OK = False
+    _FITZ_ERRO = str(e)
 
 import backend_molde as bm
 from innova_bridge.api.deps import usuario_autenticado
@@ -243,21 +253,6 @@ async def listar_moldes(
     return ListaMoldesResponse(moldes=nomes)
 
 
-@router.get("/{nome}", response_model=Dict[str, Any])
-async def obter_molde(
-    nome: str,
-    _user: Dict = Depends(usuario_autenticado),
-):
-    """Retorna o dict completo de um molde pelo nome. Qualquer usuário autenticado."""
-    molde = bm.carregar_molde(nome)
-    if molde is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Molde '{nome}' não encontrado.",
-        )
-    return molde
-
-
 @router.post("/detectar", response_model=DetectarResponse)
 async def detectar_candidatos(
     pdf: UploadFile = File(...),
@@ -348,3 +343,92 @@ async def detectar_candidatos(
             os.remove(tmp_path)
         except Exception:
             pass
+
+
+@router.post("/ocr-regiao")
+async def ocr_regiao(
+    pdf: UploadFile = File(...),
+    pagina: int = Form(0),
+    x: int = Form(...),
+    y: int = Form(...),
+    w: int = Form(...),
+    h: int = Form(...),
+    dpi: int = Form(200),
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Extrai o texto de uma REGIÃO de um PDF digital (texto selecionável) via PyMuPDF.
+
+    Parâmetros (multipart/form):
+      - pdf      : arquivo PDF
+      - pagina   : índice 0-based da página (padrão 0)
+      - x, y, w, h : região em pixels no DPI de referência
+      - dpi      : DPI de referência usado na detecção (padrão 200)
+
+    Retorna {"texto": "...", "vazio": bool, "fonte": "pymupdf", "pagina": int}.
+    Requer PyMuPDF (fitz). Para PDFs escaneados (sem texto selecionável) o texto
+    retornado será vazio — use o endpoint de OCR por imagem nesses casos.
+    """
+    if not _FITZ_OK:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PyMuPDF (fitz) não está disponível: {_FITZ_ERRO}. Instale com: pip install pymupdf",
+        )
+
+    pasta_moldes = bm.garantir_pasta_moldes()
+    tmp_nome = f"_tmp_ocrregiao_{uuid.uuid4().hex}.pdf"
+    tmp_path = os.path.join(pasta_moldes, tmp_nome)
+
+    try:
+        conteudo = await pdf.read()
+        with open(tmp_path, "wb") as f:
+            f.write(conteudo)
+
+        doc = fitz.open(tmp_path)
+        try:
+            if not (0 <= pagina < doc.page_count):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Página {pagina} fora do intervalo válido (0–{doc.page_count - 1}).",
+                )
+
+            page = doc[pagina]
+
+            # Converte região de pixels@dpi para pontos do PDF (1 pt = 1/72 pol)
+            f_conv = 72.0 / dpi
+            rect = fitz.Rect(x * f_conv, y * f_conv, (x + w) * f_conv, (y + h) * f_conv)
+
+            texto = page.get_text("text", clip=rect)
+            texto = (texto or "").strip()
+            # Normaliza quebras de linha internas → espaço simples
+            texto = " ".join(texto.split())
+        finally:
+            doc.close()
+
+        return {
+            "texto": texto,
+            "vazio": len(texto) == 0,
+            "fonte": "pymupdf",
+            "pagina": pagina,
+        }
+
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+
+
+@router.get("/{nome}", response_model=Dict[str, Any])
+async def obter_molde(
+    nome: str,
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """Retorna o dict completo de um molde pelo nome. Qualquer usuário autenticado."""
+    molde = bm.carregar_molde(nome)
+    if molde is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Molde '{nome}' não encontrado.",
+        )
+    return molde

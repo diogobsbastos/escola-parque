@@ -606,19 +606,25 @@ async def analisar_tabela(
                 # Esquerda da 1ª coluna de quadrados (menor x)
                 x_esq_quadrados = min(c["x"] for c in filtrados)
 
-                # Cabeçalho de cada coluna j
+                # Cabeçalho de cada coluna j — alargado para cobrir a célula inteira,
+                # usando pontos médios entre centros de colunas vizinhas.
                 colunas_out: List[Dict[str, Any]] = []
                 for j, ref_cx in enumerate(grupos_cols_cx):
-                    # x-range: todos os quadrados desta coluna
-                    cands_col = [c for c in filtrados if abs((c["x"] + c["w"] / 2.0) - ref_cx) < tol_col]
-                    if cands_col:
-                        col_x0 = max(0, min(c["x"] for c in cands_col) - 4)
-                        col_x1 = max(c["x"] + c["w"] for c in cands_col) + 4
-                        col_w = col_x1 - col_x0
+                    # Borda ESQUERDA: ponto médio entre cx da coluna anterior e cx atual;
+                    # para a 1ª coluna usa a borda esquerda da região (x).
+                    if j == 0:
+                        cab_x0 = x
                     else:
-                        col_x0 = int(ref_cx) - 10
-                        col_x1 = int(ref_cx) + 10
-                        col_w = 20
+                        cab_x0 = int((grupos_cols_cx[j - 1] + ref_cx) / 2.0)
+
+                    # Borda DIREITA: ponto médio entre cx atual e cx da coluna seguinte;
+                    # para a última coluna usa a borda direita da região (x + w).
+                    if j == n_colunas - 1:
+                        cab_x1 = x + w
+                    else:
+                        cab_x1 = int((ref_cx + grupos_cols_cx[j + 1]) / 2.0)
+
+                    col_w = cab_x1 - cab_x0
 
                     # y-range do cabeçalho: do topo da região até 2px acima do topo dos quadrados
                     cab_y0 = y
@@ -626,12 +632,12 @@ async def analisar_tabela(
 
                     texto_cab = ""
                     if cab_y1 > cab_y0:
-                        texto_cab = _ocr_regiao_px(page, col_x0, cab_y0, col_x1, cab_y1, dpi)
+                        texto_cab = _ocr_regiao_px(page, cab_x0, cab_y0, cab_x1, cab_y1, dpi)
 
                     colunas_out.append({
                         "indice": j,
                         "texto": texto_cab,
-                        "x": col_x0,
+                        "x": cab_x0,
                         "w": col_w,
                     })
 

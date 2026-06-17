@@ -16,6 +16,9 @@ Endpoints novos (Sessões Dinâmicas — exam_templates):
   POST /api/v1/moldes/templates              Salva novo template no formato 3.0-Sessões.
   GET  /api/v1/moldes/templates              Lista templates (sem definition).
   GET  /api/v1/moldes/templates/{tid}        Retorna template completo por id.
+
+Endpoint de análise de tabela:
+  POST /api/v1/moldes/analisar-tabela        Detecta grid de quadrados numa região tabular e faz OCR de cabeçalhos/perguntas.
 """
 from __future__ import annotations
 
@@ -112,6 +115,26 @@ def _parse_uuid_or_none(valor: Optional[str]) -> Optional[str]:
         return str(valor)
     except (ValueError, AttributeError):
         return None
+
+
+def _mediana(valores: List[float]) -> float:
+    """Calcula a mediana de uma lista de floats. Retorna 0.0 se vazia."""
+    if not valores:
+        return 0.0
+    s = sorted(valores)
+    n = len(s)
+    meio = n // 2
+    if n % 2 == 1:
+        return float(s[meio])
+    return float(s[meio - 1] + s[meio]) / 2.0
+
+
+def _ocr_regiao_px(page: Any, x0: int, y0: int, x1: int, y1: int, dpi: int) -> str:
+    """Extrai e normaliza texto de uma região em pixels (PyMuPDF). Requer _FITZ_OK."""
+    f_conv = 72.0 / dpi
+    rect = fitz.Rect(x0 * f_conv, y0 * f_conv, x1 * f_conv, y1 * f_conv)
+    texto = page.get_text("text", clip=rect) or ""
+    return " ".join(texto.split())
 
 
 # ───────────────────────────────────────────────
@@ -411,6 +434,256 @@ async def ocr_regiao(
             "fonte": "pymupdf",
             "pagina": pagina,
         }
+
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+
+
+@router.post("/analisar-tabela")
+async def analisar_tabela(
+    pdf: UploadFile = File(...),
+    pagina: int = Form(0),
+    x: int = Form(...),
+    y: int = Form(...),
+    w: int = Form(...),
+    h: int = Form(...),
+    dpi: int = Form(200),
+    threshold: float = Form(0.75),
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Analisa uma região retangular de um PDF que contém uma TABELA de checkboxes.
+
+    Detecta o grid de quadrados (linhas = perguntas, colunas = opções), agrupa-os
+    em linhas e colunas e extrai via OCR (PyMuPDF) o texto de cabeçalho de cada
+    coluna e o rótulo (pergunta) de cada linha.
+
+    Parâmetros (multipart/form):
+      - pdf        : arquivo PDF
+      - pagina     : índice 0-based da página (padrão 0)
+      - x, y, w, h : região em pixels no DPI de referência que envolve a tabela
+      - dpi        : DPI de referência (padrão 200)
+      - threshold  : limiar de correlação para detecção de quadrados (padrão 0.75)
+
+    Retorna estrutura com n_linhas, n_colunas, colunas (com texto OCR do cabeçalho),
+    linhas (com texto OCR da pergunta e lista de quadrados) e lista plana de todos
+    os quadrados com seus índices (linha, coluna).
+    """
+    if not _FITZ_OK:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PyMuPDF (fitz) não está disponível: {_FITZ_ERRO}. Instale com: pip install pymupdf",
+        )
+
+    pasta_moldes = bm.garantir_pasta_moldes()
+    tmp_nome = f"_tmp_tabela_{uuid.uuid4().hex}.pdf"
+    tmp_path = os.path.join(pasta_moldes, tmp_nome)
+
+    try:
+        conteudo = await pdf.read()
+        with open(tmp_path, "wb") as f:
+            f.write(conteudo)
+
+        try:
+            # ── 1. Detectar quadrados via backend_molde ──────────────────────────
+            res = bm.detectar_candidatos_para_molde(tmp_path, x_max_pct=0.98, threshold=threshold)
+            if "erro" in res:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=res["erro"],
+                )
+
+            cands = res.get("candidatos", [])
+
+            # Filtra apenas candidatos da página e cujo centro caia dentro da região
+            x_fim = x + w
+            y_fim = y + h
+            filtrados = []
+            for c in cands:
+                if c.get("pag", 0) != pagina:
+                    continue
+                cx = c["x"] + c["w"] / 2.0
+                cy = c["y"] + c["h"] / 2.0
+                if x <= cx <= x_fim and y <= cy <= y_fim:
+                    filtrados.append(c)
+
+            # Estrutura vazia se não encontrou nenhum quadrado
+            if not filtrados:
+                return {
+                    "pagina": pagina,
+                    "n_linhas": 0,
+                    "n_colunas": 0,
+                    "colunas": [],
+                    "linhas": [],
+                    "quadrados": [],
+                }
+
+            # ── 2. Agrupar em LINHAS ─────────────────────────────────────────────
+            med_h = _mediana([float(c["h"]) for c in filtrados])
+            tol_linha = 0.6 * med_h if med_h > 0 else 8.0
+
+            # Ordenar por centro-y
+            filtrados_ordenados = sorted(filtrados, key=lambda c: c["y"] + c["h"] / 2.0)
+
+            grupos_linhas: List[List[Dict]] = []
+            for c in filtrados_ordenados:
+                cy = c["y"] + c["h"] / 2.0
+                alocado = False
+                for grupo in grupos_linhas:
+                    cy_ref = grupo[0]["y"] + grupo[0]["h"] / 2.0
+                    if abs(cy - cy_ref) < tol_linha:
+                        grupo.append(c)
+                        alocado = True
+                        break
+                if not alocado:
+                    grupos_linhas.append([c])
+
+            # Ordenar linhas de cima para baixo; dentro de cada linha ordenar por x
+            grupos_linhas.sort(key=lambda g: g[0]["y"] + g[0]["h"] / 2.0)
+            for g in grupos_linhas:
+                g.sort(key=lambda c: c["x"])
+
+            # ── 3. Agrupar em COLUNAS ────────────────────────────────────────────
+            med_w = _mediana([float(c["w"]) for c in filtrados])
+            tol_col = 0.6 * med_w if med_w > 0 else 8.0
+
+            # Coletar todos os centros-x para agrupar
+            todos_cx = [c["x"] + c["w"] / 2.0 for c in filtrados]
+            todos_cx_sorted = sorted(set(todos_cx))
+
+            grupos_cols_cx: List[float] = []
+            for cx_val in sorted([c["x"] + c["w"] / 2.0 for c in filtrados]):
+                alocado = False
+                for i, ref_cx in enumerate(grupos_cols_cx):
+                    if abs(cx_val - ref_cx) < tol_col:
+                        # Atualiza referência como média
+                        grupos_cols_cx[i] = (ref_cx + cx_val) / 2.0
+                        alocado = True
+                        break
+                if not alocado:
+                    grupos_cols_cx.append(cx_val)
+
+            grupos_cols_cx.sort()  # da esquerda para a direita
+
+            def _col_idx(c: Dict) -> int:
+                cx_val = c["x"] + c["w"] / 2.0
+                melhor = 0
+                melhor_dist = abs(cx_val - grupos_cols_cx[0])
+                for i, ref_cx in enumerate(grupos_cols_cx):
+                    dist = abs(cx_val - ref_cx)
+                    if dist < melhor_dist:
+                        melhor_dist = dist
+                        melhor = i
+                return melhor
+
+            # ── 4. Montar lista plana com (linha_idx, coluna_idx) ────────────────
+            quadrados_planos: List[Dict[str, Any]] = []
+            for linha_idx, grupo in enumerate(grupos_linhas):
+                for c in grupo:
+                    col_idx = _col_idx(c)
+                    quadrados_planos.append({
+                        "x": c["x"],
+                        "y": c["y"],
+                        "w": c["w"],
+                        "h": c["h"],
+                        "linha": linha_idx,
+                        "coluna": col_idx,
+                    })
+
+            n_linhas = len(grupos_linhas)
+            n_colunas = len(grupos_cols_cx)
+
+            # ── 5. OCR via PyMuPDF ───────────────────────────────────────────────
+            doc = fitz.open(tmp_path)
+            try:
+                page = doc[pagina]
+
+                # Topo da 1ª linha de quadrados (menor y entre todos os quadrados)
+                y_topo_quadrados = min(c["y"] for c in filtrados)
+                # Esquerda da 1ª coluna de quadrados (menor x)
+                x_esq_quadrados = min(c["x"] for c in filtrados)
+
+                # Cabeçalho de cada coluna j
+                colunas_out: List[Dict[str, Any]] = []
+                for j, ref_cx in enumerate(grupos_cols_cx):
+                    # x-range: todos os quadrados desta coluna
+                    cands_col = [c for c in filtrados if abs((c["x"] + c["w"] / 2.0) - ref_cx) < tol_col]
+                    if cands_col:
+                        col_x0 = max(0, min(c["x"] for c in cands_col) - 4)
+                        col_x1 = max(c["x"] + c["w"] for c in cands_col) + 4
+                        col_w = col_x1 - col_x0
+                    else:
+                        col_x0 = int(ref_cx) - 10
+                        col_x1 = int(ref_cx) + 10
+                        col_w = 20
+
+                    # y-range do cabeçalho: do topo da região até 2px acima do topo dos quadrados
+                    cab_y0 = y
+                    cab_y1 = max(y, y_topo_quadrados - 2)
+
+                    texto_cab = ""
+                    if cab_y1 > cab_y0:
+                        texto_cab = _ocr_regiao_px(page, col_x0, cab_y0, col_x1, cab_y1, dpi)
+
+                    colunas_out.append({
+                        "indice": j,
+                        "texto": texto_cab,
+                        "x": col_x0,
+                        "w": col_w,
+                    })
+
+                # Rótulo (pergunta) de cada linha i
+                linhas_out: List[Dict[str, Any]] = []
+                for i, grupo in enumerate(grupos_linhas):
+                    # y-range: quadrados desta linha com padding
+                    lin_y0 = max(0, min(c["y"] for c in grupo) - 4)
+                    lin_y1 = max(c["y"] + c["h"] for c in grupo) + 4
+                    lin_h = lin_y1 - lin_y0
+
+                    # x-range do rótulo: da borda esquerda da região até 2px antes do 1º quadrado
+                    rot_x0 = x
+                    rot_x1 = max(x, x_esq_quadrados - 2)
+
+                    texto_rot = ""
+                    if rot_x1 > rot_x0:
+                        texto_rot = _ocr_regiao_px(page, rot_x0, lin_y0, rot_x1, lin_y1, dpi)
+
+                    # Quadrados desta linha
+                    quads_linha = [
+                        q for q in quadrados_planos if q["linha"] == i
+                    ]
+
+                    linhas_out.append({
+                        "indice": i,
+                        "pergunta": texto_rot,
+                        "y": lin_y0,
+                        "h": lin_h,
+                        "quadrados": quads_linha,
+                    })
+
+            finally:
+                doc.close()
+
+            # ── 6. Resposta ──────────────────────────────────────────────────────
+            return {
+                "pagina": pagina,
+                "n_linhas": n_linhas,
+                "n_colunas": n_colunas,
+                "colunas": colunas_out,
+                "linhas": linhas_out,
+                "quadrados": quadrados_planos,
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(e),
+            )
 
     finally:
         try:

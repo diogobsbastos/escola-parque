@@ -21,10 +21,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from innova_bridge.api.routers import formularios as formularios_router
 from innova_bridge.api.routers import moldes as moldes_router
+from innova_bridge.api.routers import correcoes as correcoes_router
 
-# ────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────
 # App
-# ────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────
 
 app = FastAPI(
     title="Innova Exams API",
@@ -52,16 +53,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────
 # Routers
-# ────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────
 
 app.include_router(formularios_router.router, prefix="/api/v1")
 app.include_router(moldes_router.router, prefix="/api/v1")
+app.include_router(correcoes_router.router, prefix="/api/v1")
 
-# ────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────
 # Endpoints base
-# ────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────
 
 _START_TIME = time.time()
 

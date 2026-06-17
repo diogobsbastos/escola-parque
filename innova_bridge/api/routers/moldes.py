@@ -6,14 +6,20 @@ Reutiliza o motor OpenCV encapsulado em `backend_molde` (root do projeto) para:
   - carregar um molde pelo nome
   - detectar candidatos a marcação (bolhas/caixas) em um PDF enviado pelo cliente
 
-Endpoints:
+Endpoints existentes:
   GET  /api/v1/moldes                Lista todos os nomes de moldes disponíveis.
   GET  /api/v1/moldes/{nome}         Retorna o dict completo de um molde.
   POST /api/v1/moldes/detectar       Recebe PDF, roda detecção OpenCV, retorna candidatos + imagens base64.
+
+Endpoints novos (Sessões Dinâmicas — exam_templates):
+  POST /api/v1/moldes/templates              Salva novo template no formato 3.0-Sessões.
+  GET  /api/v1/moldes/templates              Lista templates (sem definition).
+  GET  /api/v1/moldes/templates/{tid}        Retorna template completo por id.
 """
 from __future__ import annotations
 
 import base64
+import json
 import os
 import uuid
 from typing import Any, Dict, List, Optional
@@ -30,12 +36,13 @@ except ImportError:
 
 import backend_molde as bm
 from innova_bridge.api.deps import usuario_autenticado
+from innova_bridge.db import get_pool
 
 router = APIRouter(prefix="/moldes", tags=["moldes"])
 
-# ────────────────────────────────────────────────────────────────
-# Modelos Pydantic
-# ────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────
+# Modelos Pydantic — originais
+# ───────────────────────────────────────────────
 
 
 class ListaMoldesResponse(BaseModel):
@@ -66,9 +73,165 @@ class DetectarResponse(BaseModel):
     paginas: List[PaginaImagem]
 
 
-# ────────────────────────────────────────────────────────────────
-# Endpoints
-# ────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────
+# Modelos Pydantic — templates Sessões Dinâmicas
+# ──────────────────────────────────────────────
+
+_KINDS_VALIDOS = ("agente1_intake", "exam_correction")
+
+
+class TemplateIn(BaseModel):
+    name: str
+    kind: str = "agente1_intake"
+    definition: Dict[str, Any]
+    template_layout: Optional[str] = None
+    dpi_referencia: int = 200
+    school_id: Optional[str] = None
+
+
+# ───────────────────────────────────────────────
+# Helpers internos
+# ───────────────────────────────────────────────
+
+def _parse_uuid_or_none(valor: Optional[str]) -> Optional[str]:
+    """Retorna a string se for UUID válido, senão None."""
+    if not valor:
+        return None
+    try:
+        uuid.UUID(str(valor))
+        return str(valor)
+    except (ValueError, AttributeError):
+        return None
+
+
+# ───────────────────────────────────────────────
+# Endpoints — templates Sessões Dinâmicas
+# (declarados ANTES de /{nome} para evitar captura pelo catch-all)
+# ───────────────────────────────────────────────
+
+
+@router.post("/templates", status_code=status.HTTP_201_CREATED)
+async def criar_template(
+    body: TemplateIn,
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Salva um novo template no formato 3.0-Sessões na tabela exam_templates.
+
+    Retorna o id gerado e a quantidade de sessões detectada no definition.
+    """
+    if body.kind not in _KINDS_VALIDOS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"kind inválido: '{body.kind}'. Valores permitidos: {list(_KINDS_VALIDOS)}",
+        )
+
+    qtd_sessoes = len(body.definition.get("sessions", []))
+    definition_json = json.dumps(body.definition)
+
+    # created_by: usar id do usuário somente se for UUID válido
+    created_by = _parse_uuid_or_none(_user.get("id"))
+    school_id = _parse_uuid_or_none(body.school_id)
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO exam_templates
+                (name, kind, definition, template_layout, dpi_referencia,
+                 qtd_sessoes, school_id, created_by, updated_at)
+            VALUES
+                ($1, $2, $3::jsonb, $4, $5,
+                 $6, $7::uuid, $8::uuid, now())
+            RETURNING id
+            """,
+            body.name,
+            body.kind,
+            definition_json,
+            body.template_layout,
+            body.dpi_referencia,
+            qtd_sessoes,
+            school_id,
+            created_by,
+        )
+
+    return {"id": row["id"], "qtd_sessoes": qtd_sessoes}
+
+
+@router.get("/templates")
+async def listar_templates(
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Lista templates cadastrados (sem o campo definition para economizar tráfego).
+
+    Retorna id, name, kind, qtd_sessoes, is_active, template_layout, created_at,
+    ordenados do mais recente ao mais antigo.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, name, kind, qtd_sessoes, is_active, template_layout, created_at
+            FROM exam_templates
+            ORDER BY created_at DESC
+            """
+        )
+
+    templates = [dict(row) for row in rows]
+    # Converter created_at para string ISO se necessário
+    for t in templates:
+        if t.get("created_at") is not None:
+            t["created_at"] = t["created_at"].isoformat()
+
+    return {"templates": templates}
+
+
+@router.get("/templates/{tid}")
+async def obter_template(
+    tid: int,
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Retorna o template completo (incluindo definition) pelo id numérico.
+
+    Retorna 404 se não encontrado.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT id, name, kind, definition, template_layout, dpi_referencia,
+                   qtd_sessoes, is_active, school_id, created_by, created_at, updated_at
+            FROM exam_templates
+            WHERE id = $1
+            """,
+            tid,
+        )
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template id={tid} não encontrado.",
+        )
+
+    result = dict(row)
+    # Converter timestamps para string ISO
+    for campo in ("created_at", "updated_at"):
+        if result.get(campo) is not None:
+            result[campo] = result[campo].isoformat()
+    # Converter UUIDs para string
+    for campo in ("school_id", "created_by"):
+        if result.get(campo) is not None:
+            result[campo] = str(result[campo])
+    # definition já vem como dict pelo asyncpg (jsonb → dict automático)
+
+    return result
+
+
+# ───────────────────────────────────────────────
+# Endpoints — originais
+# ───────────────────────────────────────────────
 
 
 @router.get("", response_model=ListaMoldesResponse)

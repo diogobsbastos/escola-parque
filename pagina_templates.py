@@ -70,9 +70,9 @@ TEMPLATES = [
 ]
 
 
-# ════════════════════════════════════════════════════════════════════
+# ====================================================================
 # Persistência de cores (_template_cores.json)
-# ════════════════════════════════════════════════════════════════════
+# ====================================================================
 
 def _carregar_cores() -> dict:
     """Lê _template_cores.json; retorna {} se não existir ou for inválido."""
@@ -100,9 +100,9 @@ def _cores_template(template: dict) -> tuple[str, str]:
     return light, dark
 
 
-# ════════════════════════════════════════════════════════════════════
+# ====================================================================
 # Aplicar cores no banco (public.schools)
-# ════════════════════════════════════════════════════════════════════
+# ====================================================================
 
 async def _aplicar_cores_banco_async(light: str, dark: str) -> None:
     """UPDATE em todas as escolas — há essencialmente uma (Escola Parque)."""
@@ -123,9 +123,9 @@ def _aplicar_cores_banco(light: str, dark: str) -> tuple[bool, str]:
         return False, f"Banco: {type(e).__name__}: {e}"
 
 
-# ════════════════════════════════════════════════════════════════════
+# ====================================================================
 # Token / credenciais do GitHub
-# ════════════════════════════════════════════════════════════════════
+# ====================================================================
 
 def _extrair_token_de_url(linha: str) -> str:
     try:
@@ -225,11 +225,11 @@ def _ativar(template):
     return False, f"GitHub {r.status_code}: {r.text[:200]}"
 
 
-# ════════════════════════════════════════════════════════════════════
+# ====================================================================
 # Render
-# ════════════════════════════════════════════════════════════════════
+# ====================================================================
 
-def render_pagina_templates():
+def _render_templates_conteudo():
     st.title("🎨 Templates do Frontend")
     st.caption(
         "Escolha qual template do frontend fica ativo. Cada um é independente (uma branch). "
@@ -251,7 +251,7 @@ def render_pagina_templates():
 
     for t in TEMPLATES:
         with st.container(border=True):
-            # ── Linha 1: título + botão Ativar ──────────────────────
+            # -- Linha 1: titulo + botao Ativar --
             c1, c2 = st.columns([4, 1])
             with c1:
                 marca = " ✅ **ATIVO**" if ativo == t["id"] else ""
@@ -272,7 +272,7 @@ def render_pagina_templates():
                     else:
                         st.error(msg)
 
-            # ── Linha 2: editor de cor (apenas Intermediário e Claude Design) ──
+            # -- Linha 2: editor de cor (apenas Intermediario e Claude Design) --
             if t.get("cor_editavel"):
                 st.divider()
                 light_saved, dark_saved = _cores_template(t)
@@ -303,3 +303,19 @@ def render_pagina_templates():
                                 st.warning(f"Cores salvas no JSON, mas falhou no banco: {msg_banco}")
                         except Exception as e:
                             st.error(f"Erro ao salvar cores: {type(e).__name__}: {e}")
+
+
+def render_pagina_templates():
+    """Area Templates: aba do seletor de template + aba de Videos da Landing."""
+    _tab_tpl, _tab_vid = st.tabs(["🎨 Templates do Frontend", "📹 Vídeos da Landing"])
+    with _tab_tpl:
+        _render_templates_conteudo()
+    with _tab_vid:
+        try:
+            import pagina_videos_landing
+            pagina_videos_landing.render_conteudo()
+        except Exception as _e_vid:
+            st.error(f"Falha ao carregar Vídeos da Landing: {type(_e_vid).__name__} — {_e_vid}")
+            import traceback
+            with st.expander("Traceback"):
+                st.code(traceback.format_exc())

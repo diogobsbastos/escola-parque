@@ -135,10 +135,14 @@ def _montar_verification_url(
     e redireciona o usuário para o destino final.
 
     Formato:
-        {site_url}/auth/confirm
+        {base}/auth/confirm
             ?token_hash={token_hash}
             &type={email_action_type}
             &next={next_path}
+
+    A base é derivada como scheme://host de site_url (ou redirect_to como
+    fallback), descartando qualquer path (ex.: /auth/v1) que o GoTrue possa
+    incluir no site_url. Isso evita URLs duplicadas como /auth/v1/auth/confirm.
 
     O parâmetro `next` é extraído do `redirect_to` recebido pelo GoTrue:
       - Se redirect_to vier com ?next=/alguma/rota, extrai esse valor.
@@ -163,7 +167,16 @@ def _montar_verification_url(
         except Exception:
             pass  # mantém o padrão
 
-    base = site_url.rstrip("/")
+    # Deriva base como scheme://host, descartando qualquer path que venha no
+    # site_url (ex.: GoTrue envia https://dominio.com/auth/v1 — queremos só
+    # https://dominio.com para não duplicar o path na URL final).
+    _src = site_url or redirect_to or ""
+    _p = urlparse(_src)
+    if _p.scheme and _p.netloc:
+        base = _p.scheme + "://" + _p.netloc
+    else:
+        base = site_url.rstrip("/")
+
     # Calculamos os valores encoded em variáveis para evitar barras invertidas
     # dentro de expressões f-string (SyntaxError no Python 3.10).
     next_safe_chars = "/:@!$&'()*+,;="
@@ -452,7 +465,7 @@ async def hook_send_email(request: Request) -> Response:
             corpo_html=corpo_html,
         )
     except Exception as exc:
-        logger.exception("Exceção inesperada ao chamar enviar_email: %s", exc)
+        logger.exception("Excessão inesperada ao chamar enviar_email: %s", exc)
         return JSONResponse(
             status_code=500,
             content={"error": f"Unexpected error in email_sender: {exc}"},

@@ -47,6 +47,13 @@ _registrar(
 )
 
 _registrar(
+    view="login_google",
+    label="🔐 Login com Google (OAuth)",
+    import_path="pagina_login_google",
+    func_name="render_pagina_login_google",
+)
+
+_registrar(
     view="cadastros",
     label="👤 Cadastro de Usuários",
     import_path="pagina_cadastros",

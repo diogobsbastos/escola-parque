@@ -9,7 +9,7 @@ Requisitos:
     fastapi, uvicorn[standard]  — já estão no requirements.txt do projeto.
 
 Como rodar (manualmente, para teste):
-    GOTRUE_SEND_EMAIL_HOOK_SECRET=<seu_secret_base64> \
+    GOTRUE_SEND_EMAIL_HOOK_SECRET=<seu_secret_base64> \\
         uvicorn email_hook_gotrue:app --host 127.0.0.1 --port 8502
 
 Para produção, use o unit systemd 'escolaparque-emailhook.service' descrito no RUNBOOK.
@@ -29,7 +29,7 @@ import logging
 import os
 import sys
 import textwrap
-from urllib.parse import quote as url_quote
+from urllib.parse import quote as url_quote, urlparse, parse_qs
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
@@ -64,7 +64,7 @@ except ImportError as exc:
 app = FastAPI(
     title="GoTrue Send Email Hook — Innova Exams",
     description="Recebe o webhook de e-mail do GoTrue e envia via motor de e-mail dinâmico.",
-    version="1.0.0",
+    version="1.1.0",
 )
 
 # ---------------------------------------------------------------------------
@@ -117,6 +117,60 @@ def _verificar_assinatura(secret_bytes: bytes, webhook_id: str, webhook_timestam
             return True
 
     return False
+
+
+# ---------------------------------------------------------------------------
+# Helper: montar URL de verificação apontando para o frontend Next.js
+# ---------------------------------------------------------------------------
+
+def _montar_verification_url(
+    site_url: str,
+    token_hash: str,
+    email_action_type: str,
+    redirect_to: str,
+) -> str:
+    """
+    Monta a URL de verificação apontando para a rota do frontend Next.js
+    /auth/confirm, que chama supabase.auth.verifyOtp({ token_hash, type })
+    e redireciona o usuário para o destino final.
+
+    Formato:
+        {site_url}/auth/confirm
+            ?token_hash={token_hash}
+            &type={email_action_type}
+            &next={next_path}
+
+    O parâmetro `next` é extraído do `redirect_to` recebido pelo GoTrue:
+      - Se redirect_to vier com ?next=/alguma/rota, extrai esse valor.
+      - Se redirect_to for uma URL do próprio site (ex.: https://dominio.com/app/foo),
+        extrai o path (/app/foo).
+      - Caso contrário, usa /app/configuracoes/senha (padrão para recovery).
+    """
+    next_path = "/app/configuracoes/senha"  # padrão seguro
+
+    if redirect_to:
+        try:
+            parsed = urlparse(redirect_to)
+            # Tenta extrair ?next= do próprio redirect_to
+            qs = parse_qs(parsed.query)
+            if "next" in qs:
+                next_path = qs["next"][0]
+            elif parsed.path and parsed.path not in ("/", ""):
+                # Usa o path da URL como destino final
+                next_path = parsed.path
+                if parsed.query:
+                    next_path += "?" + parsed.query
+        except Exception:
+            pass  # mantém o padrão
+
+    base = site_url.rstrip("/")
+    url = (
+        f"{base}/auth/confirm"
+        f"?token_hash={url_quote(token_hash, safe='')}"
+        f"&type={url_quote(email_action_type, safe='')}"
+        f"&next={url_quote(next_path, safe='/:@!$&\'()*+,;=')}"
+    )
+    return url
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +358,7 @@ async def hook_send_email(request: Request) -> Response:
     1. Lê body raw.
     2. Valida assinatura HMAC-SHA256 (Standard Webhooks).
     3. Parseia JSON e extrai user + email_data.
-    4. Monta URL de verificação e corpo HTML.
+    4. Monta URL de verificação apontando para /auth/confirm do frontend Next.js.
     5. Envia via email_sender.enviar_email (com failover).
     6. Responde 200 {} em sucesso.
     """
@@ -357,13 +411,21 @@ async def hook_send_email(request: Request) -> Response:
     redirect_to = email_data.get("redirect_to", "")
     site_url = email_data.get("site_url", "").rstrip("/")
 
-    # --- 4. Montar URL de verificação ---
-    # Equivalente ao {{ .ConfirmationURL }} dos templates GoTrue
-    verification_url = (
-        f"{site_url}/auth/v1/verify"
-        f"?token={url_quote(token_hash, safe='')}"
-        f"&type={url_quote(email_action_type, safe='')}"
-        f"&redirect_to={url_quote(redirect_to, safe=':/?=&')}"
+    # --- 4. Montar URL de verificação → rota /auth/confirm do frontend Next.js ---
+    # A rota /auth/confirm chama supabase.auth.verifyOtp({ token_hash, type })
+    # e redireciona para `next` após verificação bem-sucedida.
+    # Isso evita o 404 causado pelo link antigo /auth/v1/verify que caía no Next.js.
+    verification_url = _montar_verification_url(
+        site_url=site_url,
+        token_hash=token_hash,
+        email_action_type=email_action_type,
+        redirect_to=redirect_to,
+    )
+
+    logger.info(
+        "URL de verificação montada: tipo='%s' url='%s'",
+        email_action_type,
+        verification_url,
     )
 
     # --- 4b. Selecionar config de texto e montar HTML ---

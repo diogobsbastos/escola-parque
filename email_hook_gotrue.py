@@ -164,11 +164,17 @@ def _montar_verification_url(
             pass  # mantém o padrão
 
     base = site_url.rstrip("/")
+    # Calculamos os valores encoded em variáveis para evitar barras invertidas
+    # dentro de expressões f-string (SyntaxError no Python 3.10).
+    next_safe_chars = "/:@!$&'()*+,;="
+    tok_encoded = url_quote(token_hash, safe="")
+    type_encoded = url_quote(email_action_type, safe="")
+    next_encoded = url_quote(next_path, safe=next_safe_chars)
     url = (
         f"{base}/auth/confirm"
-        f"?token_hash={url_quote(token_hash, safe='')}"
-        f"&type={url_quote(email_action_type, safe='')}"
-        f"&next={url_quote(next_path, safe='/:@!$&\'()*+,;=')}"
+        f"?token_hash={tok_encoded}"
+        f"&type={type_encoded}"
+        f"&next={next_encoded}"
     )
     return url
 

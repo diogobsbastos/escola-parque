@@ -1,1 +1,734 @@
-"""\ninnova_bridge/api/routers/moldes.py — Endpoints de moldes de gabarito (máscaras OMR).\n\nReutiliza o motor OpenCV encapsulado em `backend_molde` (root do projeto) para:\n  - listar moldes salvos (Postgres com fallback disco)\n  - carregar um molde pelo nome\n  - detectar candidatos a marcação (bolhas/caixas) em um PDF enviado pelo cliente\n\nEndpoints existentes:\n  GET  /api/v1/moldes                Lista todos os nomes de moldes disponíveis.\n  GET  /api/v1/moldes/{nome}         Retorna o dict completo de um molde.\n  POST /api/v1/moldes/detectar       Recebe PDF, roda detecção OpenCV, retorna candidatos + imagens base64.\n  POST /api/v1/moldes/ocr-regiao     Extrai texto de uma região de um PDF digital via PyMuPDF.\n\nEndpoints novos (Sessões Dinâmicas — exam_templates):\n  POST /api/v1/moldes/templates              Salva novo template no formato 3.0-Sessões.\n  GET  /api/v1/moldes/templates              Lista templates (sem definition).\n  GET  /api/v1/moldes/templates/{tid}        Retorna template completo por id.\n\nEndpoint de análise de tabela:\n  POST /api/v1/moldes/analisar-tabela        Detecta grid de quadrados numa região tabular e faz OCR de cabeçalhos/perguntas.\n"""\nfrom __future__ import annotations\n\nimport base64\nimport json\nimport os\nimport uuid\nfrom typing import Any, Dict, List, Optional\n\nfrom fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status\nfrom pydantic import BaseModel\n\n# Importação defensiva do OpenCV — pode não estar instalado no ambiente mínimo\ntry:\n    import cv2\n    _CV2_OK = True\nexcept ImportError:\n    _CV2_OK = False\n\n# Importação defensiva do PyMuPDF — usado para OCR de PDFs digitais\ntry:\n    import fitz  # PyMuPDF\n    _FITZ_OK = True\n    _FITZ_ERRO = ""\nexcept Exception as e:\n    _FITZ_OK = False\n    _FITZ_ERRO = str(e)\n\nimport backend_molde as bm\nfrom innova_bridge.api.deps import usuario_autenticado\nfrom innova_bridge.db import get_pool\n\nrouter = APIRouter(prefix="/moldes", tags=["moldes"])\n\n# ───────────────────────────────────────────────\n# Modelos Pydantic — originais\n# ───────────────────────────────────────────────\n\n\nclass ListaMoldesResponse(BaseModel):\n    moldes: List[str]\n\n\nclass PaginaImagem(BaseModel):\n    numero: int\n    largura_px: int\n    altura_px: int\n    imagem_base64: str  # "data:image/png;base64,..."\n\n\nclass CandidatoMolde(BaseModel):\n    pag: int\n    x: int\n    y: int\n    w: int\n    h: int\n    score: float\n    stddev: float\n\n\nclass DetectarResponse(BaseModel):\n    qtd_paginas: int\n    qtd_candidatos: int\n    candidatos: List[Dict[str, Any]]\n    paginas: List[PaginaImagem]\n\n\n# ───────────────────────────────────────────────\n# Modelos Pydantic — templates Sessões Dinâmicas\n# ──────────────────────────────────────────────\n\n_KINDS_VALIDOS = ("agente1_intake", "exam_correction")\n\n\nclass TemplateIn(BaseModel):\n    name: str\n    kind: str = "agente1_intake"\n    definition: Dict[str, Any]\n    template_layout: Optional[str] = None\n    dpi_referencia: int = 200\n    school_id: Optional[str] = None\n\n\n# ───────────────────────────────────────────────\n# Helpers internos\n# ───────────────────────────────────────────────\n\ndef _parse_uuid_or_none(valor: Optional[str]) -> Optional[str]:\n    """Retorna a string se for UUID válido, senão None."""\n    if not valor:\n        return None\n    try:\n        uuid.UUID(str(valor))\n        return str(valor)\n    except (ValueError, AttributeError):\n        return None\n\n\ndef _mediana(valores: List[float]) -> float:\n    """Calcula a mediana de uma lista de floats. Retorna 0.0 se vazia."""\n    if not valores:\n        return 0.0\n    s = sorted(valores)\n    n = len(s)\n    meio = n // 2\n    if n % 2 == 1:\n        return float(s[meio])\n    return float(s[meio - 1] + s[meio]) / 2.0\n\n\ndef _ocr_regiao_px(page: Any, x0: int, y0: int, x1: int, y1: int, dpi: int) -> str:\n    """Extrai e normaliza texto de uma região em pixels (PyMuPDF). Requer _FITZ_OK."""\n    f_conv = 72.0 / dpi\n    rect = fitz.Rect(x0 * f_conv, y0 * f_conv, x1 * f_conv, y1 * f_conv)\n    texto = page.get_text("text", clip=rect) or ""\n    return " ".join(texto.split())\n\n\ndef _ocr_ultima_linha_px(page: Any, x0: int, y0: int, x1: int, y1: int, dpi: int) -> str:\n    """Texto da ÚLTIMA linha (mais baixa) dentro da região em pixels (PyMuPDF).\n    Usado p/ cabeçalho de coluna: pega só a linha logo acima dos quadrados,\n    ignorando texto superior (ex.: instrução da prova). Requer _FITZ_OK."""\n    f_conv = 72.0 / dpi\n    rect = fitz.Rect(x0 * f_conv, y0 * f_conv, x1 * f_conv, y1 * f_conv)\n    dados = page.get_text("dict", clip=rect) or {}\n    linhas: list[tuple[float, str]] = []\n    for bloco in dados.get("blocks", []):\n        for ln in bloco.get("lines", []):\n            txt = " ".join(s.get("text", "") for s in ln.get("spans", []))\n            txt = " ".join(txt.split())\n            if txt:\n                y_top = ln.get("bbox", [0, 0, 0, 0])[1]\n                linhas.append((y_top, txt))\n    if not linhas:\n        return ""\n    linhas.sort(key=lambda t: t[0])\n    return linhas[-1][1]\n\n\n# ───────────────────────────────────────────────\n# Endpoints — templates Sessões Dinâmicas\n# (declarados ANTES de /{nome} para evitar captura pelo catch-all)\n# ───────────────────────────────────────────────\n\n\n@router.post("/templates", status_code=status.HTTP_201_CREATED)\nasync def criar_template(\n    body: TemplateIn,\n    _user: Dict = Depends(usuario_autenticado),\n):\n    """\n    Salva um novo template no formato 3.0-Sessões na tabela exam_templates.\n\n    Retorna o id gerado e a quantidade de sessões detectada no definition.\n    """\n    if body.kind not in _KINDS_VALIDOS:\n        raise HTTPException(\n            status_code=status.HTTP_400_BAD_REQUEST,\n            detail=f"kind inválido: '{body.kind}'. Valores permitidos: {list(_KINDS_VALIDOS)}",\n        )\n\n    qtd_sessoes = len(body.definition.get("sessions", []))\n    definition_json = json.dumps(body.definition)\n\n    # created_by: usar id do usuário somente se for UUID válido\n    created_by = _parse_uuid_or_none(_user.get("id"))\n    school_id = _parse_uuid_or_none(body.school_id)\n\n    pool = await get_pool()\n    async with pool.acquire() as conn:\n        row = await conn.fetchrow(\n            """\n            INSERT INTO exam_templates\n                (name, kind, definition, template_layout, dpi_referencia,\n                 qtd_sessoes, school_id, created_by, updated_at)\n            VALUES\n                ($1, $2, $3::jsonb, $4, $5,\n                 $6, $7::uuid, $8::uuid, now())\n            RETURNING id\n            """,\n            body.name,\n            body.kind,\n            definition_json,\n            body.template_layout,\n            body.dpi_referencia,\n            qtd_sessoes,\n            school_id,\n            created_by,\n        )\n\n    return {"id": row["id"], "qtd_sessoes": qtd_sessoes}\n\n\n@router.get("/templates")\nasync def listar_templates(\n    _user: Dict = Depends(usuario_autenticado),\n):\n    """\n    Lista templates cadastrados (sem o campo definition para economizar tráfego).\n\n    Retorna id, name, kind, qtd_sessoes, is_active, template_layout, created_at,\n    ordenados do mais recente ao mais antigo.\n    """\n    pool = await get_pool()\n    async with pool.acquire() as conn:\n        rows = await conn.fetch(\n            """\n            SELECT id, name, kind, qtd_sessoes, is_active, template_layout, created_at\n            FROM exam_templates\n            ORDER BY created_at DESC\n            """\n        )\n\n    templates = [dict(row) for row in rows]\n    # Converter created_at para string ISO se necessário\n    for t in templates:\n        if t.get("created_at") is not None:\n            t["created_at"] = t["created_at"].isoformat()\n\n    return {"templates": templates}\n\n\n@router.get("/templates/{tid}")\nasync def obter_template(\n    tid: int,\n    _user: Dict = Depends(usuario_autenticado),\n):\n    """\n    Retorna o template completo (incluindo definition) pelo id numérico.\n\n    Retorna 404 se não encontrado.\n    """\n    pool = await get_pool()\n    async with pool.acquire() as conn:\n        row = await conn.fetchrow(\n            """\n            SELECT id, name, kind, definition, template_layout, dpi_referencia,\n                   qtd_sessoes, is_active, school_id, created_by, created_at, updated_at\n            FROM exam_templates\n            WHERE id = $1\n            """,\n            tid,\n        )\n\n    if row is None:\n        raise HTTPException(\n            status_code=status.HTTP_404_NOT_FOUND,\n            detail=f"Template id={tid} não encontrado.",\n        )\n\n    result = dict(row)\n    # Converter timestamps para string ISO\n    for campo in ("created_at", "updated_at"):\n        if result.get(campo) is not None:\n            result[campo] = result[campo].isoformat()\n    # Converter UUIDs para string\n    for campo in ("school_id", "created_by"):\n        if result.get(campo) is not None:\n            result[campo] = str(result[campo])\n    # definition já vem como dict pelo asyncpg (jsonb → dict automático)\n\n    return result\n\n\n# ───────────────────────────────────────────────\n# Endpoints — originais\n# ───────────────────────────────────────────────\n\n\n@router.get("", response_model=ListaMoldesResponse)\nasync def listar_moldes(\n    _user: Dict = Depends(usuario_autenticado),\n):\n    """Lista todos os moldes disponíveis. Qualquer usuário autenticado."""\n    nomes = bm.listar_moldes()\n    return ListaMoldesResponse(moldes=nomes)\n\n\n@router.post("/detectar", response_model=DetectarResponse)\nasync def detectar_candidatos(\n    pdf: UploadFile = File(...),\n    hibrido: bool = Form(False),\n    threshold: float = Form(0.60),\n    _user: Dict = Depends(usuario_autenticado),\n):\n    """\n    Recebe um PDF e roda a detecção OpenCV de candidatos a marcação.\n\n    Retorna por página: imagem PNG em base64 + lista de candidatos com\n    posição (x, y, w, h) e métricas de qualidade (score, stddev).\n\n    hibrido: quando True, busca caixas em toda a largura da página (x_max_pct=0.98)\n             em vez dos 20% da esquerda (comportamento padrão).\n    threshold: limiar mínimo de correlação para aceitar um match (0.0–1.0).\n               Default 0.60. Valores mais altos reduzem falsos-positivos de letras.\n\n    # TODO: mover para threadpool se necessário (funções de backend são síncronas).\n    """\n    if not _CV2_OK:\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail="OpenCV (cv2) não está instalado neste ambiente. Instale com: pip install opencv-python-headless",\n        )\n\n    # Validar que o arquivo é um PDF\n    eh_pdf = (\n        (pdf.content_type or "").lower() == "application/pdf"\n        or (pdf.filename or "").lower().endswith(".pdf")\n    )\n    if not eh_pdf:\n        raise HTTPException(\n            status_code=status.HTTP_400_BAD_REQUEST,\n            detail="O arquivo enviado não é um PDF. Envie um arquivo .pdf.",\n        )\n\n    pasta_moldes = bm.garantir_pasta_moldes()\n    tmp_nome = f"_tmp_detectar_{uuid.uuid4().hex}.pdf"\n    tmp_path = os.path.join(pasta_moldes, tmp_nome)\n\n    try:\n        conteudo = await pdf.read()\n        with open(tmp_path, "wb") as f:\n            f.write(conteudo)\n\n        if hibrido:\n            resultado = bm.detectar_candidatos_para_molde(tmp_path, x_max_pct=0.98, threshold=threshold)\n        else:\n            resultado = bm.detectar_candidatos_para_molde(tmp_path, threshold=threshold)\n\n        if "erro" in resultado:\n            raise HTTPException(\n                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,\n                detail=resultado["erro"],\n            )\n\n        # Serializar imagens numpy → PNG → base64\n        paginas_out: List[PaginaImagem] = []\n        paginas_imagens: Dict = resultado.get("paginas_imagens", {})\n        for num_pag, img_bgr in sorted(paginas_imagens.items(), key=lambda kv: kv[0]):\n            altura_px, largura_px = img_bgr.shape[:2]\n            ok, buf = cv2.imencode(".png", img_bgr)\n            if not ok:\n                raise HTTPException(\n                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n                    detail=f"Falha ao codificar imagem da página {num_pag} em PNG.",\n                )\n            b64 = base64.b64encode(buf.tobytes()).decode("ascii")\n            paginas_out.append(\n                PaginaImagem(\n                    numero=int(num_pag),\n                    largura_px=largura_px,\n                    altura_px=altura_px,\n                    imagem_base64=f"data:image/png;base64,{b64}",\n                )\n            )\n\n        return DetectarResponse(\n            qtd_paginas=resultado.get("qtd_paginas", len(paginas_out)),\n            qtd_candidatos=resultado.get("qtd_candidatos", len(resultado.get("candidatos", []))),\n            candidatos=resultado.get("candidatos", []),\n            paginas=paginas_out,\n        )\n\n    finally:\n        try:\n            os.remove(tmp_path)\n        except Exception:\n            pass\n\n\n@router.post("/ocr-regiao")\nasync def ocr_regiao(\n    pdf: UploadFile = File(...),\n    pagina: int = Form(0),\n    x: int = Form(...),\n    y: int = Form(...),\n    w: int = Form(...),\n    h: int = Form(...),\n    dpi: int = Form(200),\n    _user: Dict = Depends(usuario_autenticado),\n):\n    """\n    Extrai o texto de uma REGIÃO de um PDF digital (texto selecionável) via PyMuPDF.\n\n    Parâmetros (multipart/form):\n      - pdf      : arquivo PDF\n      - pagina   : índice 0-based da página (padrão 0)\n      - x, y, w, h : região em pixels no DPI de referência\n      - dpi      : DPI de referência usado na detecção (padrão 200)\n\n    Retorna {"texto": "...", "vazio": bool, "fonte": "pymupdf", "pagina": int}.\n    Requer PyMuPDF (fitz). Para PDFs escaneados (sem texto selecionável) o texto\n    retornado será vazio — use o endpoint de OCR por imagem nesses casos.\n    """\n    if not _FITZ_OK:\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=f"PyMuPDF (fitz) não está disponível: {_FITZ_ERRO}. Instale com: pip install pymupdf",\n        )\n\n    pasta_moldes = bm.garantir_pasta_moldes()\n    tmp_nome = f"_tmp_ocrregiao_{uuid.uuid4().hex}.pdf"\n    tmp_path = os.path.join(pasta_moldes, tmp_nome)\n\n    try:\n        conteudo = await pdf.read()\n        with open(tmp_path, "wb") as f:\n            f.write(conteudo)\n\n        doc = fitz.open(tmp_path)\n        try:\n            if not (0 <= pagina < doc.page_count):\n                raise HTTPException(\n                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,\n                    detail=f"Página {pagina} fora do intervalo válido (0–{doc.page_count - 1}).",\n                )\n\n            page = doc[pagina]\n\n            # Converte região de pixels@dpi para pontos do PDF (1 pt = 1/72 pol)\n            f_conv = 72.0 / dpi\n            rect = fitz.Rect(x * f_conv, y * f_conv, (x + w) * f_conv, (y + h) * f_conv)\n\n            texto = page.get_text("text", clip=rect)\n            texto = (texto or "").strip()\n            # Normaliza quebras de linha internas → espaço simples\n            texto = " ".join(texto.split())\n        finally:\n            doc.close()\n\n        return {\n            "texto": texto,\n            "vazio": len(texto) == 0,\n            "fonte": "pymupdf",\n            "pagina": pagina,\n        }\n\n    finally:\n        try:\n            os.remove(tmp_path)\n        except Exception:\n            pass\n\n\n@router.post("/analisar-tabela")\nasync def analisar_tabela(\n    pdf: UploadFile = File(...),\n    pagina: int = Form(0),\n    x: int = Form(...),\n    y: int = Form(...),\n    w: int = Form(...),\n    h: int = Form(...),\n    dpi: int = Form(200),\n    threshold: float = Form(0.75),\n    _user: Dict = Depends(usuario_autenticado),\n):\n    """\n    Analisa uma região retangular de um PDF que contém uma TABELA de checkboxes.\n\n    Detecta o grid de quadrados (linhas = perguntas, colunas = opções), agrupa-os\n    em linhas e colunas e extrai via OCR (PyMuPDF) o texto de cabeçalho de cada\n    coluna e o rótulo (pergunta) de cada linha.\n\n    Parâmetros (multipart/form):\n      - pdf        : arquivo PDF\n      - pagina     : índice 0-based da página (padrão 0)\n      - x, y, w, h : região em pixels no DPI de referência que envolve a tabela\n      - dpi        : DPI de referência (padrão 200)\n      - threshold  : limiar de correlação para detecção de quadrados (padrão 0.75)\n\n    Retorna estrutura com n_linhas, n_colunas, colunas (com texto OCR do cabeçalho),\n    linhas (com texto OCR da pergunta e lista de quadrados) e lista plana de todos\n    os quadrados com seus índices (linha, coluna).\n    """\n    if not _FITZ_OK:\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=f"PyMuPDF (fitz) não está disponível: {_FITZ_ERRO}. Instale com: pip install pymupdf",\n        )\n\n    pasta_moldes = bm.garantir_pasta_moldes()\n    tmp_nome = f"_tmp_tabela_{uuid.uuid4().hex}.pdf"\n    tmp_path = os.path.join(pasta_moldes, tmp_nome)\n\n    try:\n        conteudo = await pdf.read()\n        with open(tmp_path, "wb") as f:\n            f.write(conteudo)\n\n        try:\n            # ── 1. Detectar quadrados via backend_molde ──────────────────────────\n            res = bm.detectar_candidatos_para_molde(tmp_path, x_max_pct=0.98, threshold=threshold)\n            if "erro" in res:\n                raise HTTPException(\n                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,\n                    detail=res["erro"],\n                )\n\n            cands = res.get("candidatos", [])\n\n            # Filtra apenas candidatos da página e cujo centro caia dentro da região\n            x_fim = x + w\n            y_fim = y + h\n            filtrados = []\n            for c in cands:\n                if c.get("pag", 0) != pagina:\n                    continue\n                cx = c["x"] + c["w"] / 2.0\n                cy = c["y"] + c["h"] / 2.0\n                if x <= cx <= x_fim and y <= cy <= y_fim:\n                    filtrados.append(c)\n\n            # Estrutura vazia se não encontrou nenhum quadrado\n            if not filtrados:\n                return {\n                    "pagina": pagina,\n                    "n_linhas": 0,\n                    "n_colunas": 0,\n                    "colunas": [],\n                    "linhas": [],\n                    "quadrados": [],\n                }\n\n            # ── 2. Agrupar em LINHAS ─────────────────────────────────────────────\n            med_h = _mediana([float(c["h"]) for c in filtrados])\n            tol_linha = 0.6 * med_h if med_h > 0 else 8.0\n\n            # Ordenar por centro-y\n            filtrados_ordenados = sorted(filtrados, key=lambda c: c["y"] + c["h"] / 2.0)\n\n            grupos_linhas: List[List[Dict]] = []\n            for c in filtrados_ordenados:\n                cy = c["y"] + c["h"] / 2.0\n                alocado = False\n                for grupo in grupos_linhas:\n                    cy_ref = grupo[0]["y"] + grupo[0]["h"] / 2.0\n                    if abs(cy - cy_ref) < tol_linha:\n                        grupo.append(c)\n                        alocado = True\n                        break\n                if not alocado:\n                    grupos_linhas.append([c])\n\n            # Ordenar linhas de cima para baixo; dentro de cada linha ordenar por x\n            grupos_linhas.sort(key=lambda g: g[0]["y"] + g[0]["h"] / 2.0)\n            for g in grupos_linhas:\n                g.sort(key=lambda c: c["x"])\n\n            # ── 3. Agrupar em COLUNAS ────────────────────────────────────────────\n            med_w = _mediana([float(c["w"]) for c in filtrados])\n            tol_col = 0.6 * med_w if med_w > 0 else 8.0\n\n            # Coletar todos os centros-x para agrupar\n            todos_cx = [c["x"] + c["w"] / 2.0 for c in filtrados]\n            todos_cx_sorted = sorted(set(todos_cx))\n\n            grupos_cols_cx: List[float] = []\n            for cx_val in sorted([c["x"] + c["w"] / 2.0 for c in filtrados]):\n                alocado = False\n                for i, ref_cx in enumerate(grupos_cols_cx):\n                    if abs(cx_val - ref_cx) < tol_col:\n                        # Atualiza referência como média\n                        grupos_cols_cx[i] = (ref_cx + cx_val) / 2.0\n                        alocado = True\n                        break\n                if not alocado:\n                    grupos_cols_cx.append(cx_val)\n\n            grupos_cols_cx.sort()  # da esquerda para a direita\n\n            def _col_idx(c: Dict) -> int:\n                cx_val = c["x"] + c["w"] / 2.0\n                melhor = 0\n                melhor_dist = abs(cx_val - grupos_cols_cx[0])\n                for i, ref_cx in enumerate(grupos_cols_cx):\n                    dist = abs(cx_val - ref_cx)\n                    if dist < melhor_dist:\n                        melhor_dist = dist\n                        melhor = i\n                return melhor\n\n            # ── 4. Montar lista plana com (linha_idx, coluna_idx) ────────────────\n            quadrados_planos: List[Dict[str, Any]] = []\n            for linha_idx, grupo in enumerate(grupos_linhas):\n                for c in grupo:\n                    col_idx = _col_idx(c)\n                    quadrados_planos.append({\n                        "x": c["x"],\n                        "y": c["y"],\n                        "w": c["w"],\n                        "h": c["h"],\n                        "linha": linha_idx,\n                        "coluna": col_idx,\n                    })\n\n            n_linhas = len(grupos_linhas)\n            n_colunas = len(grupos_cols_cx)\n\n            # ── 5. OCR via PyMuPDF ───────────────────────────────────────────────\n            doc = fitz.open(tmp_path)\n            try:\n                page = doc[pagina]\n\n                # Topo da 1ª linha de quadrados (menor y entre todos os quadrados)\n                y_topo_quadrados = min(c["y"] for c in filtrados)\n                # Esquerda da 1ª coluna de quadrados (menor x)\n                x_esq_quadrados = min(c["x"] for c in filtrados)\n\n                # Cabeçalho de cada coluna j — alargado para cobrir a célula inteira,\n                # usando pontos médios entre centros de colunas vizinhas.\n                colunas_out: List[Dict[str, Any]] = []\n                for j, ref_cx in enumerate(grupos_cols_cx):\n                    # Borda ESQUERDA: ponto médio entre cx da coluna anterior e cx atual;\n                    # para a 1ª coluna usa a borda esquerda da região (x).\n                    if j == 0:\n                        cab_x0 = x\n                    else:\n                        cab_x0 = int((grupos_cols_cx[j - 1] + ref_cx) / 2.0)\n\n                    # Borda DIREITA: ponto médio entre cx atual e cx da coluna seguinte;\n                    # para a última coluna usa a borda direita da região (x + w).\n                    if j == n_colunas - 1:\n                        cab_x1 = x + w\n                    else:\n                        cab_x1 = int((ref_cx + grupos_cols_cx[j + 1]) / 2.0)\n\n                    col_w = cab_x1 - cab_x0\n\n                    # y-range do cabeçalho: do topo da região até 2px acima do topo dos quadrados\n                    cab_y0 = y\n                    cab_y1 = max(y, y_topo_quadrados - 2)\n\n                    texto_cab = ""\n                    if cab_y1 > cab_y0:\n                        texto_cab = _ocr_ultima_linha_px(page, cab_x0, cab_y0, cab_x1, cab_y1, dpi)\n\n                    colunas_out.append({\n                        "indice": j,\n                        "texto": texto_cab,\n                        "x": cab_x0,\n                        "w": col_w,\n                    })\n\n                # Rótulo (pergunta) de cada linha i\n                linhas_out: List[Dict[str, Any]] = []\n                for i, grupo in enumerate(grupos_linhas):\n                    # y-range: quadrados desta linha com padding\n                    lin_y0 = max(0, min(c["y"] for c in grupo) - 4)\n                    lin_y1 = max(c["y"] + c["h"] for c in grupo) + 4\n                    lin_h = lin_y1 - lin_y0\n\n                    # x-range do rótulo: da borda esquerda da região até 2px antes do 1º quadrado\n                    rot_x0 = x\n                    rot_x1 = max(x, x_esq_quadrados - 2)\n\n                    texto_rot = ""\n                    if rot_x1 > rot_x0:\n                        texto_rot = _ocr_regiao_px(page, rot_x0, lin_y0, rot_x1, lin_y1, dpi)\n\n                    # Quadrados desta linha\n                    quads_linha = [\n                        q for q in quadrados_planos if q["linha"] == i\n                    ]\n\n                    linhas_out.append({\n                        "indice": i,\n                        "pergunta": texto_rot,\n                        "y": lin_y0,\n                        "h": lin_h,\n                        "quadrados": quads_linha,\n                    })\n\n            finally:\n                doc.close()\n\n            # ── 6. Resposta ──────────────────────────────────────────────────────\n            return {\n                "pagina": pagina,\n                "n_linhas": n_linhas,\n                "n_colunas": n_colunas,\n                "colunas": colunas_out,\n                "linhas": linhas_out,\n                "quadrados": quadrados_planos,\n            }\n\n        except HTTPException:\n            raise\n        except Exception as e:\n            raise HTTPException(\n                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,\n                detail=str(e),\n            )\n\n    finally:\n        try:\n            os.remove(tmp_path)\n        except Exception:\n            pass\n\n\n@router.get("/{nome}", response_model=Dict[str, Any])\nasync def obter_molde(\n    nome: str,\n    _user: Dict = Depends(usuario_autenticado),\n):\n    """Retorna o dict completo de um molde pelo nome. Qualquer usuário autenticado."""\n    molde = bm.carregar_molde(nome)\n    if molde is None:\n        raise HTTPException(\n            status_code=status.HTTP_404_NOT_FOUND,\n            detail=f"Molde '{nome}' não encontrado.",\n        )\n    return molde\n
+"""
+innova_bridge/api/routers/moldes.py — Endpoints de moldes de gabarito (máscaras OMR).
+
+Reutiliza o motor OpenCV encapsulado em `backend_molde` (root do projeto) para:
+  - listar moldes salvos (Postgres com fallback disco)
+  - carregar um molde pelo nome
+  - detectar candidatos a marcação (bolhas/caixas) em um PDF enviado pelo cliente
+
+Endpoints existentes:
+  GET  /api/v1/moldes                Lista todos os nomes de moldes disponíveis.
+  GET  /api/v1/moldes/{nome}         Retorna o dict completo de um molde.
+  POST /api/v1/moldes/detectar       Recebe PDF, roda detecção OpenCV, retorna candidatos + imagens base64.
+  POST /api/v1/moldes/ocr-regiao     Extrai texto de uma região de um PDF digital via PyMuPDF.
+
+Endpoints novos (Sessões Dinâmicas — exam_templates):
+  POST /api/v1/moldes/templates              Salva novo template no formato 3.0-Sessões.
+  GET  /api/v1/moldes/templates              Lista templates (sem definition).
+  GET  /api/v1/moldes/templates/{tid}        Retorna template completo por id.
+
+Endpoint de análise de tabela:
+  POST /api/v1/moldes/analisar-tabela        Detecta grid de quadrados numa região tabular e faz OCR de cabeçalhos/perguntas.
+"""
+from __future__ import annotations
+
+import base64
+import json
+import os
+import uuid
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from pydantic import BaseModel
+
+# Importação defensiva do OpenCV — pode não estar instalado no ambiente mínimo
+try:
+    import cv2
+    _CV2_OK = True
+except ImportError:
+    _CV2_OK = False
+
+# Importação defensiva do PyMuPDF — usado para OCR de PDFs digitais
+try:
+    import fitz  # PyMuPDF
+    _FITZ_OK = True
+    _FITZ_ERRO = ""
+except Exception as e:
+    _FITZ_OK = False
+    _FITZ_ERRO = str(e)
+
+import backend_molde as bm
+from innova_bridge.api.deps import usuario_autenticado
+from innova_bridge.db import get_pool
+
+router = APIRouter(prefix="/moldes", tags=["moldes"])
+
+# ───────────────────────────────────────────────
+# Modelos Pydantic — originais
+# ───────────────────────────────────────────────
+
+
+class ListaMoldesResponse(BaseModel):
+    moldes: List[str]
+
+
+class PaginaImagem(BaseModel):
+    numero: int
+    largura_px: int
+    altura_px: int
+    imagem_base64: str  # "data:image/png;base64,..."
+
+
+class CandidatoMolde(BaseModel):
+    pag: int
+    x: int
+    y: int
+    w: int
+    h: int
+    score: float
+    stddev: float
+
+
+class DetectarResponse(BaseModel):
+    qtd_paginas: int
+    qtd_candidatos: int
+    candidatos: List[Dict[str, Any]]
+    paginas: List[PaginaImagem]
+
+
+# ───────────────────────────────────────────────
+# Modelos Pydantic — templates Sessões Dinâmicas
+# ──────────────────────────────────────────────
+
+_KINDS_VALIDOS = ("agente1_intake", "exam_correction")
+
+
+class TemplateIn(BaseModel):
+    name: str
+    kind: str = "agente1_intake"
+    definition: Dict[str, Any]
+    template_layout: Optional[str] = None
+    dpi_referencia: int = 200
+    school_id: Optional[str] = None
+
+
+# ───────────────────────────────────────────────
+# Helpers internos
+# ───────────────────────────────────────────────
+
+def _parse_uuid_or_none(valor: Optional[str]) -> Optional[str]:
+    """Retorna a string se for UUID válido, senão None."""
+    if not valor:
+        return None
+    try:
+        uuid.UUID(str(valor))
+        return str(valor)
+    except (ValueError, AttributeError):
+        return None
+
+
+def _mediana(valores: List[float]) -> float:
+    """Calcula a mediana de uma lista de floats. Retorna 0.0 se vazia."""
+    if not valores:
+        return 0.0
+    s = sorted(valores)
+    n = len(s)
+    meio = n // 2
+    if n % 2 == 1:
+        return float(s[meio])
+    return float(s[meio - 1] + s[meio]) / 2.0
+
+
+def _ocr_regiao_px(page: Any, x0: int, y0: int, x1: int, y1: int, dpi: int) -> str:
+    """Extrai e normaliza texto de uma região em pixels (PyMuPDF). Requer _FITZ_OK."""
+    f_conv = 72.0 / dpi
+    rect = fitz.Rect(x0 * f_conv, y0 * f_conv, x1 * f_conv, y1 * f_conv)
+    texto = page.get_text("text", clip=rect) or ""
+    return " ".join(texto.split())
+
+
+def _ocr_ultima_linha_px(page: Any, x0: int, y0: int, x1: int, y1: int, dpi: int) -> str:
+    """Texto da ÚLTIMA linha (mais baixa) dentro da região em pixels (PyMuPDF).
+    Usado p/ cabeçalho de coluna: pega só a linha logo acima dos quadrados,
+    ignorando texto superior (ex.: instrução da prova). Requer _FITZ_OK."""
+    f_conv = 72.0 / dpi
+    rect = fitz.Rect(x0 * f_conv, y0 * f_conv, x1 * f_conv, y1 * f_conv)
+    dados = page.get_text("dict", clip=rect) or {}
+    linhas: list[tuple[float, str]] = []
+    for bloco in dados.get("blocks", []):
+        for ln in bloco.get("lines", []):
+            txt = " ".join(s.get("text", "") for s in ln.get("spans", []))
+            txt = " ".join(txt.split())
+            if txt:
+                y_top = ln.get("bbox", [0, 0, 0, 0])[1]
+                linhas.append((y_top, txt))
+    if not linhas:
+        return ""
+    linhas.sort(key=lambda t: t[0])
+    return linhas[-1][1]
+
+
+# ───────────────────────────────────────────────
+# Endpoints — templates Sessões Dinâmicas
+# (declarados ANTES de /{nome} para evitar captura pelo catch-all)
+# ───────────────────────────────────────────────
+
+
+@router.post("/templates", status_code=status.HTTP_201_CREATED)
+async def criar_template(
+    body: TemplateIn,
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Salva um novo template no formato 3.0-Sessões na tabela exam_templates.
+
+    Retorna o id gerado e a quantidade de sessões detectada no definition.
+    """
+    if body.kind not in _KINDS_VALIDOS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"kind inválido: '{body.kind}'. Valores permitidos: {list(_KINDS_VALIDOS)}",
+        )
+
+    qtd_sessoes = len(body.definition.get("sessions", []))
+    definition_json = json.dumps(body.definition)
+
+    # created_by: usar id do usuário somente se for UUID válido
+    created_by = _parse_uuid_or_none(_user.get("id"))
+    school_id = _parse_uuid_or_none(body.school_id)
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO exam_templates
+                (name, kind, definition, template_layout, dpi_referencia,
+                 qtd_sessoes, school_id, created_by, updated_at)
+            VALUES
+                ($1, $2, $3::jsonb, $4, $5,
+                 $6, $7::uuid, $8::uuid, now())
+            RETURNING id
+            """,
+            body.name,
+            body.kind,
+            definition_json,
+            body.template_layout,
+            body.dpi_referencia,
+            qtd_sessoes,
+            school_id,
+            created_by,
+        )
+
+    return {"id": row["id"], "qtd_sessoes": qtd_sessoes}
+
+
+@router.get("/templates")
+async def listar_templates(
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Lista templates cadastrados (sem o campo definition para economizar tráfego).
+
+    Retorna id, name, kind, qtd_sessoes, is_active, template_layout, created_at,
+    ordenados do mais recente ao mais antigo.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, name, kind, qtd_sessoes, is_active, template_layout, created_at
+            FROM exam_templates
+            ORDER BY created_at DESC
+            """
+        )
+
+    templates = [dict(row) for row in rows]
+    # Converter created_at para string ISO se necessário
+    for t in templates:
+        if t.get("created_at") is not None:
+            t["created_at"] = t["created_at"].isoformat()
+
+    return {"templates": templates}
+
+
+@router.get("/templates/{tid}")
+async def obter_template(
+    tid: int,
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Retorna o template completo (incluindo definition) pelo id numérico.
+
+    Retorna 404 se não encontrado.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT id, name, kind, definition, template_layout, dpi_referencia,
+                   qtd_sessoes, is_active, school_id, created_by, created_at, updated_at
+            FROM exam_templates
+            WHERE id = $1
+            """,
+            tid,
+        )
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template id={tid} não encontrado.",
+        )
+
+    result = dict(row)
+    # Converter timestamps para string ISO
+    for campo in ("created_at", "updated_at"):
+        if result.get(campo) is not None:
+            result[campo] = result[campo].isoformat()
+    # Converter UUIDs para string
+    for campo in ("school_id", "created_by"):
+        if result.get(campo) is not None:
+            result[campo] = str(result[campo])
+    # definition já vem como dict pelo asyncpg (jsonb → dict automático)
+
+    return result
+
+
+# ───────────────────────────────────────────────
+# Endpoints — originais
+# ───────────────────────────────────────────────
+
+
+@router.get("", response_model=ListaMoldesResponse)
+async def listar_moldes(
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """Lista todos os moldes disponíveis. Qualquer usuário autenticado."""
+    nomes = bm.listar_moldes()
+    return ListaMoldesResponse(moldes=nomes)
+
+
+@router.post("/detectar", response_model=DetectarResponse)
+async def detectar_candidatos(
+    pdf: UploadFile = File(...),
+    hibrido: bool = Form(False),
+    threshold: float = Form(0.60),
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Recebe um PDF e roda a detecção OpenCV de candidatos a marcação.
+
+    Retorna por página: imagem PNG em base64 + lista de candidatos com
+    posição (x, y, w, h) e métricas de qualidade (score, stddev).
+
+    hibrido: quando True, busca caixas em toda a largura da página (x_max_pct=0.98)
+             em vez dos 20% da esquerda (comportamento padrão).
+    threshold: limiar mínimo de correlação para aceitar um match (0.0–1.0).
+               Default 0.60. Valores mais altos reduzem falsos-positivos de letras.
+
+    # TODO: mover para threadpool se necessário (funções de backend são síncronas).
+    """
+    if not _CV2_OK:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OpenCV (cv2) não está instalado neste ambiente. Instale com: pip install opencv-python-headless",
+        )
+
+    # Validar que o arquivo é um PDF
+    eh_pdf = (
+        (pdf.content_type or "").lower() == "application/pdf"
+        or (pdf.filename or "").lower().endswith(".pdf")
+    )
+    if not eh_pdf:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O arquivo enviado não é um PDF. Envie um arquivo .pdf.",
+        )
+
+    pasta_moldes = bm.garantir_pasta_moldes()
+    tmp_nome = f"_tmp_detectar_{uuid.uuid4().hex}.pdf"
+    tmp_path = os.path.join(pasta_moldes, tmp_nome)
+
+    try:
+        conteudo = await pdf.read()
+        with open(tmp_path, "wb") as f:
+            f.write(conteudo)
+
+        if hibrido:
+            resultado = bm.detectar_candidatos_para_molde(tmp_path, x_max_pct=0.98, threshold=threshold)
+        else:
+            resultado = bm.detectar_candidatos_para_molde(tmp_path, threshold=threshold)
+
+        if "erro" in resultado:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=resultado["erro"],
+            )
+
+        # Serializar imagens numpy → PNG → base64
+        paginas_out: List[PaginaImagem] = []
+        paginas_imagens: Dict = resultado.get("paginas_imagens", {})
+        for num_pag, img_bgr in sorted(paginas_imagens.items(), key=lambda kv: kv[0]):
+            altura_px, largura_px = img_bgr.shape[:2]
+            ok, buf = cv2.imencode(".png", img_bgr)
+            if not ok:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Falha ao codificar imagem da página {num_pag} em PNG.",
+                )
+            b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+            paginas_out.append(
+                PaginaImagem(
+                    numero=int(num_pag),
+                    largura_px=largura_px,
+                    altura_px=altura_px,
+                    imagem_base64=f"data:image/png;base64,{b64}",
+                )
+            )
+
+        return DetectarResponse(
+            qtd_paginas=resultado.get("qtd_paginas", len(paginas_out)),
+            qtd_candidatos=resultado.get("qtd_candidatos", len(resultado.get("candidatos", []))),
+            candidatos=resultado.get("candidatos", []),
+            paginas=paginas_out,
+        )
+
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+
+
+@router.post("/ocr-regiao")
+async def ocr_regiao(
+    pdf: UploadFile = File(...),
+    pagina: int = Form(0),
+    x: int = Form(...),
+    y: int = Form(...),
+    w: int = Form(...),
+    h: int = Form(...),
+    dpi: int = Form(200),
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Extrai o texto de uma REGIÃO de um PDF digital (texto selecionável) via PyMuPDF.
+
+    Parâmetros (multipart/form):
+      - pdf      : arquivo PDF
+      - pagina   : índice 0-based da página (padrão 0)
+      - x, y, w, h : região em pixels no DPI de referência
+      - dpi      : DPI de referência usado na detecção (padrão 200)
+
+    Retorna {"texto": "...", "vazio": bool, "fonte": "pymupdf", "pagina": int}.
+    Requer PyMuPDF (fitz). Para PDFs escaneados (sem texto selecionável) o texto
+    retornado será vazio — use o endpoint de OCR por imagem nesses casos.
+    """
+    if not _FITZ_OK:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PyMuPDF (fitz) não está disponível: {_FITZ_ERRO}. Instale com: pip install pymupdf",
+        )
+
+    pasta_moldes = bm.garantir_pasta_moldes()
+    tmp_nome = f"_tmp_ocrregiao_{uuid.uuid4().hex}.pdf"
+    tmp_path = os.path.join(pasta_moldes, tmp_nome)
+
+    try:
+        conteudo = await pdf.read()
+        with open(tmp_path, "wb") as f:
+            f.write(conteudo)
+
+        doc = fitz.open(tmp_path)
+        try:
+            if not (0 <= pagina < doc.page_count):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Página {pagina} fora do intervalo válido (0–{doc.page_count - 1}).",
+                )
+
+            page = doc[pagina]
+
+            # Converte região de pixels@dpi para pontos do PDF (1 pt = 1/72 pol)
+            f_conv = 72.0 / dpi
+            rect = fitz.Rect(x * f_conv, y * f_conv, (x + w) * f_conv, (y + h) * f_conv)
+
+            texto = page.get_text("text", clip=rect)
+            texto = (texto or "").strip()
+            # Normaliza quebras de linha internas → espaço simples
+            texto = " ".join(texto.split())
+        finally:
+            doc.close()
+
+        return {
+            "texto": texto,
+            "vazio": len(texto) == 0,
+            "fonte": "pymupdf",
+            "pagina": pagina,
+        }
+
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+
+
+@router.post("/analisar-tabela")
+async def analisar_tabela(
+    pdf: UploadFile = File(...),
+    pagina: int = Form(0),
+    x: int = Form(...),
+    y: int = Form(...),
+    w: int = Form(...),
+    h: int = Form(...),
+    dpi: int = Form(200),
+    threshold: float = Form(0.75),
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Analisa uma região retangular de um PDF que contém uma TABELA de checkboxes.
+
+    Detecta o grid de quadrados (linhas = perguntas, colunas = opções), agrupa-os
+    em linhas e colunas e extrai via OCR (PyMuPDF) o texto de cabeçalho de cada
+    coluna e o rótulo (pergunta) de cada linha.
+
+    Parâmetros (multipart/form):
+      - pdf        : arquivo PDF
+      - pagina     : índice 0-based da página (padrão 0)
+      - x, y, w, h : região em pixels no DPI de referência que envolve a tabela
+      - dpi        : DPI de referência (padrão 200)
+      - threshold  : limiar de correlação para detecção de quadrados (padrão 0.75)
+
+    Retorna estrutura com n_linhas, n_colunas, colunas (com texto OCR do cabeçalho),
+    linhas (com texto OCR da pergunta e lista de quadrados) e lista plana de todos
+    os quadrados com seus índices (linha, coluna).
+    """
+    if not _FITZ_OK:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PyMuPDF (fitz) não está disponível: {_FITZ_ERRO}. Instale com: pip install pymupdf",
+        )
+
+    pasta_moldes = bm.garantir_pasta_moldes()
+    tmp_nome = f"_tmp_tabela_{uuid.uuid4().hex}.pdf"
+    tmp_path = os.path.join(pasta_moldes, tmp_nome)
+
+    try:
+        conteudo = await pdf.read()
+        with open(tmp_path, "wb") as f:
+            f.write(conteudo)
+
+        try:
+            # ── 1. Detectar quadrados via backend_molde ──────────────────────────
+            res = bm.detectar_candidatos_para_molde(tmp_path, x_max_pct=0.98, threshold=threshold)
+            if "erro" in res:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=res["erro"],
+                )
+
+            cands = res.get("candidatos", [])
+
+            # Filtra apenas candidatos da página e cujo centro caia dentro da região
+            x_fim = x + w
+            y_fim = y + h
+            filtrados = []
+            for c in cands:
+                if c.get("pag", 0) != pagina:
+                    continue
+                cx = c["x"] + c["w"] / 2.0
+                cy = c["y"] + c["h"] / 2.0
+                if x <= cx <= x_fim and y <= cy <= y_fim:
+                    filtrados.append(c)
+
+            # Estrutura vazia se não encontrou nenhum quadrado
+            if not filtrados:
+                return {
+                    "pagina": pagina,
+                    "n_linhas": 0,
+                    "n_colunas": 0,
+                    "colunas": [],
+                    "linhas": [],
+                    "quadrados": [],
+                }
+
+            # ── 2. Agrupar em LINHAS ─────────────────────────────────────────────
+            med_h = _mediana([float(c["h"]) for c in filtrados])
+            tol_linha = 0.6 * med_h if med_h > 0 else 8.0
+
+            # Ordenar por centro-y
+            filtrados_ordenados = sorted(filtrados, key=lambda c: c["y"] + c["h"] / 2.0)
+
+            grupos_linhas: List[List[Dict]] = []
+            for c in filtrados_ordenados:
+                cy = c["y"] + c["h"] / 2.0
+                alocado = False
+                for grupo in grupos_linhas:
+                    cy_ref = grupo[0]["y"] + grupo[0]["h"] / 2.0
+                    if abs(cy - cy_ref) < tol_linha:
+                        grupo.append(c)
+                        alocado = True
+                        break
+                if not alocado:
+                    grupos_linhas.append([c])
+
+            # Ordenar linhas de cima para baixo; dentro de cada linha ordenar por x
+            grupos_linhas.sort(key=lambda g: g[0]["y"] + g[0]["h"] / 2.0)
+            for g in grupos_linhas:
+                g.sort(key=lambda c: c["x"])
+
+            # ── 3. Agrupar em COLUNAS ────────────────────────────────────────────
+            med_w = _mediana([float(c["w"]) for c in filtrados])
+            tol_col = 0.6 * med_w if med_w > 0 else 8.0
+
+            # Coletar todos os centros-x para agrupar
+            todos_cx = [c["x"] + c["w"] / 2.0 for c in filtrados]
+            todos_cx_sorted = sorted(set(todos_cx))
+
+            grupos_cols_cx: List[float] = []
+            for cx_val in sorted([c["x"] + c["w"] / 2.0 for c in filtrados]):
+                alocado = False
+                for i, ref_cx in enumerate(grupos_cols_cx):
+                    if abs(cx_val - ref_cx) < tol_col:
+                        # Atualiza referência como média
+                        grupos_cols_cx[i] = (ref_cx + cx_val) / 2.0
+                        alocado = True
+                        break
+                if not alocado:
+                    grupos_cols_cx.append(cx_val)
+
+            grupos_cols_cx.sort()  # da esquerda para a direita
+
+            def _col_idx(c: Dict) -> int:
+                cx_val = c["x"] + c["w"] / 2.0
+                melhor = 0
+                melhor_dist = abs(cx_val - grupos_cols_cx[0])
+                for i, ref_cx in enumerate(grupos_cols_cx):
+                    dist = abs(cx_val - ref_cx)
+                    if dist < melhor_dist:
+                        melhor_dist = dist
+                        melhor = i
+                return melhor
+
+            # ── 4. Montar lista plana com (linha_idx, coluna_idx) ────────────────
+            quadrados_planos: List[Dict[str, Any]] = []
+            for linha_idx, grupo in enumerate(grupos_linhas):
+                for c in grupo:
+                    col_idx = _col_idx(c)
+                    quadrados_planos.append({
+                        "x": c["x"],
+                        "y": c["y"],
+                        "w": c["w"],
+                        "h": c["h"],
+                        "linha": linha_idx,
+                        "coluna": col_idx,
+                    })
+
+            n_linhas = len(grupos_linhas)
+            n_colunas = len(grupos_cols_cx)
+
+            # ── 5. OCR via PyMuPDF ───────────────────────────────────────────────
+            doc = fitz.open(tmp_path)
+            try:
+                page = doc[pagina]
+
+                # Topo da 1ª linha de quadrados (menor y entre todos os quadrados)
+                y_topo_quadrados = min(c["y"] for c in filtrados)
+                # Esquerda da 1ª coluna de quadrados (menor x)
+                x_esq_quadrados = min(c["x"] for c in filtrados)
+
+                # Cabeçalho de cada coluna j — alargado para cobrir a célula inteira,
+                # usando pontos médios entre centros de colunas vizinhas.
+                colunas_out: List[Dict[str, Any]] = []
+                for j, ref_cx in enumerate(grupos_cols_cx):
+                    # Borda ESQUERDA: ponto médio entre cx da coluna anterior e cx atual;
+                    # para a 1ª coluna usa a borda esquerda da região (x).
+                    if j == 0:
+                        cab_x0 = x
+                    else:
+                        cab_x0 = int((grupos_cols_cx[j - 1] + ref_cx) / 2.0)
+
+                    # Borda DIREITA: ponto médio entre cx atual e cx da coluna seguinte;
+                    # para a última coluna usa a borda direita da região (x + w).
+                    if j == n_colunas - 1:
+                        cab_x1 = x + w
+                    else:
+                        cab_x1 = int((ref_cx + grupos_cols_cx[j + 1]) / 2.0)
+
+                    col_w = cab_x1 - cab_x0
+
+                    # y-range do cabeçalho: do topo da região até 2px acima do topo dos quadrados
+                    cab_y0 = y
+                    cab_y1 = max(y, y_topo_quadrados - 2)
+
+                    texto_cab = ""
+                    if cab_y1 > cab_y0:
+                        texto_cab = _ocr_ultima_linha_px(page, cab_x0, cab_y0, cab_x1, cab_y1, dpi)
+
+                    colunas_out.append({
+                        "indice": j,
+                        "texto": texto_cab,
+                        "x": cab_x0,
+                        "w": col_w,
+                    })
+
+                # Rótulo (pergunta) de cada linha i
+                linhas_out: List[Dict[str, Any]] = []
+                for i, grupo in enumerate(grupos_linhas):
+                    # y-range: quadrados desta linha com padding
+                    lin_y0 = max(0, min(c["y"] for c in grupo) - 4)
+                    lin_y1 = max(c["y"] + c["h"] for c in grupo) + 4
+                    lin_h = lin_y1 - lin_y0
+
+                    # x-range do rótulo: da borda esquerda da região até 2px antes do 1º quadrado
+                    rot_x0 = x
+                    rot_x1 = max(x, x_esq_quadrados - 2)
+
+                    texto_rot = ""
+                    if rot_x1 > rot_x0:
+                        texto_rot = _ocr_regiao_px(page, rot_x0, lin_y0, rot_x1, lin_y1, dpi)
+
+                    # Quadrados desta linha
+                    quads_linha = [
+                        q for q in quadrados_planos if q["linha"] == i
+                    ]
+
+                    linhas_out.append({
+                        "indice": i,
+                        "pergunta": texto_rot,
+                        "y": lin_y0,
+                        "h": lin_h,
+                        "quadrados": quads_linha,
+                    })
+
+            finally:
+                doc.close()
+
+            # ── 6. Resposta ──────────────────────────────────────────────────────
+            return {
+                "pagina": pagina,
+                "n_linhas": n_linhas,
+                "n_colunas": n_colunas,
+                "colunas": colunas_out,
+                "linhas": linhas_out,
+                "quadrados": quadrados_planos,
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(e),
+            )
+
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+
+
+@router.get("/{nome}", response_model=Dict[str, Any])
+async def obter_molde(
+    nome: str,
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """Retorna o dict completo de um molde pelo nome. Qualquer usuário autenticado."""
+    molde = bm.carregar_molde(nome)
+    if molde is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Molde '{nome}' não encontrado.",
+        )
+    return molde

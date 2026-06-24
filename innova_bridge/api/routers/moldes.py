@@ -11,6 +11,7 @@ Endpoints existentes:
   GET  /api/v1/moldes/{nome}         Retorna o dict completo de um molde.
   POST /api/v1/moldes/detectar       Recebe PDF, roda detecção OpenCV, retorna candidatos + imagens base64.
   POST /api/v1/moldes/ocr-regiao     Extrai texto de uma região de um PDF digital via PyMuPDF.
+  POST /api/v1/moldes/ocr-linhas     Extrai texto linha-a-linha de uma região de um PDF digital via PyMuPDF (com posição).
 
 Endpoints novos (Sessões Dinâmicas — exam_templates):
   POST /api/v1/moldes/templates              Salva novo template no formato 3.0-Sessões.
@@ -711,6 +712,111 @@ async def analisar_tabela(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=str(e),
             )
+
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+
+
+@router.post("/ocr-linhas")
+async def ocr_linhas(
+    pdf: UploadFile = File(...),
+    pagina: int = Form(0),
+    x: int = Form(...),
+    y: int = Form(...),
+    w: int = Form(...),
+    h: int = Form(...),
+    dpi: int = Form(200),
+    _user: Dict = Depends(usuario_autenticado),
+):
+    """
+    Extrai o texto LINHA-A-LINHA de uma região de um PDF digital via PyMuPDF.
+
+    Parâmetros (multipart/form):
+      - pdf      : arquivo PDF
+      - pagina   : índice 0-based da página (padrão 0)
+      - x, y, w, h : região em pixels no DPI de referência
+      - dpi      : DPI de referência (padrão 200)
+
+    Retorna {"pagina": int, "linhas": [{"indice": int, "texto": str, "x": int, "y": int, "w": int, "h": int}, ...]},
+    ordenado por y (cima→baixo). Se não houver texto, linhas: [].
+    """
+    if not _FITZ_OK:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PyMuPDF (fitz) não está disponível: {_FITZ_ERRO}. Instale com: pip install pymupdf",
+        )
+
+    pasta_moldes = bm.garantir_pasta_moldes()
+    tmp_nome = f"_tmp_ocrlinhas_{uuid.uuid4().hex}.pdf"
+    tmp_path = os.path.join(pasta_moldes, tmp_nome)
+
+    try:
+        conteudo = await pdf.read()
+        with open(tmp_path, "wb") as f:
+            f.write(conteudo)
+
+        doc = fitz.open(tmp_path)
+        try:
+            if not (0 <= pagina < doc.page_count):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Página {pagina} fora do intervalo válido (0–{doc.page_count - 1}).",
+                )
+
+            page = doc[pagina]
+
+            # Converte região de pixels@dpi para pontos do PDF (1 pt = 1/72 pol)
+            f_conv = 72.0 / dpi
+            rect = fitz.Rect(x * f_conv, y * f_conv, (x + w) * f_conv, (y + h) * f_conv)
+
+            try:
+                dados = page.get_text("dict", clip=rect) or {}
+
+                linhas_out: List[Dict[str, Any]] = []
+                for bloco in dados.get("blocks", []):
+                    for ln in bloco.get("lines", []):
+                        texto = " ".join(span.get("text", "") for span in ln.get("spans", []))
+                        texto = " ".join(texto.split())
+                        if not texto:
+                            continue
+                        # bbox da linha em pontos → converte para pixels
+                        bbox = ln.get("bbox", [0, 0, 0, 0])
+                        bx0 = int(round(bbox[0] / f_conv))
+                        by0 = int(round(bbox[1] / f_conv))
+                        bx1 = int(round(bbox[2] / f_conv))
+                        by1 = int(round(bbox[3] / f_conv))
+                        linhas_out.append({
+                            "texto": texto,
+                            "x": bx0,
+                            "y": by0,
+                            "w": bx1 - bx0,
+                            "h": by1 - by0,
+                        })
+
+                # Ordenar por y (cima→baixo)
+                linhas_out.sort(key=lambda ln: ln["y"])
+                # Adicionar índice após ordenação
+                for i, ln in enumerate(linhas_out):
+                    ln["indice"] = i
+
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=str(e),
+                )
+
+        finally:
+            doc.close()
+
+        return {
+            "pagina": pagina,
+            "linhas": linhas_out,
+        }
 
     finally:
         try:
